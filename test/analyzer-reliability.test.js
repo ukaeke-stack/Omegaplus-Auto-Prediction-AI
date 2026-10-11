@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { assessPredictionReliability, rankByReliability } from "../analyzer-reliability.js";
 import { enrichPredictions } from "../independent-stats.js";
+import { deriveModel } from "../model-ensemble.js";
 
 test("missing independent evidence is explicitly limited", () => {
   const result = assessPredictionReliability({ confidence: 82, marketConfidence: 82, marketType: "ou", pick: "Over 1.5" });
@@ -53,4 +54,11 @@ test("non-football predictions do not receive football xG/form model outputs", a
   assert.deepEqual(prediction.independentSources, []);
   assert.equal(prediction.modelProbability, null);
   assert.equal(prediction.independentConfidence, null);
+});
+
+test("goal model withholds probabilities when independent inputs are missing", () => {
+  const result = deriveModel({ marketConfidence: 84, pick: "Over 1.5", marketType: "ou" });
+  assert.equal(result.modelProbability, null);
+  assert.equal(result.probabilities, null);
+  assert.equal(result.modelInputsAvailable, false);
 });
