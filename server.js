@@ -1288,7 +1288,7 @@ app.post("/api/predictions/analyze",requirePaid,async(req,r)=>{
     }
     const qualified=[...dedupe.values()].sort((a,b)=>b.confidence-a.confidence||a.startTimeMs-b.startTimeMs);
     const candidates=qualified.slice(0,Math.min(60,qualified.length));
-    const enriched=await enrichAndModel(candidates,{concurrency:3,sport:requestedSport});
+    const enriched=await enrichAndModel(candidates,{concurrency:3,sport:requestedSport,confidenceFloor:0});
     enriched.sort((a,b)=>b.confidence-a.confidence||a.startTimeMs-b.startTimeMs);
     const predictions=rankByReliability(decoratePredictions(enriched)).slice(0,maxGames);
     const reliabilitySummary={
