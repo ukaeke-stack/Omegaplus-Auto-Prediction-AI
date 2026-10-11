@@ -6,6 +6,7 @@ import {getDateResults,getLatestResults,getMyLeagues,norm as resultNorm} from ".
 import {getVerifiedResults,getVerifiedLiveResults} from "./result-sources.js";
 import {enrichPredictions,independentHealth} from "./independent-stats.js";
 import {applyDerivedModel} from "./model-ensemble.js";
+import {rankByReliability} from "./analyzer-reliability.js";
 import {analyzeCorrectScores} from "./correct-score.js";
 import {createTicket,listUserTickets,getOrCreateChat,listChatMessages,addChatMessage,adminTickets,updateTicket,adminThreads,adminMessages,adminAddMessage,setThreadStatus,initSupportDb} from "./support.js";
 import {smartPickRank,buildBetBuilder,performanceFromArchives,buildMatchReport,oddsMovement,extractOddsSnapshot} from "./advanced-features.js";
@@ -1289,7 +1290,14 @@ app.post("/api/predictions/analyze",requirePaid,async(req,r)=>{
     const candidates=qualified.slice(0,Math.min(60,qualified.length));
     const enriched=await enrichAndModel(candidates,{concurrency:3});
     enriched.sort((a,b)=>b.confidence-a.confidence||a.startTimeMs-b.startTimeMs);
-    const predictions=decoratePredictions(enriched).slice(0,maxGames);
+    const predictions=rankByReliability(decoratePredictions(enriched)).slice(0,maxGames);
+    const reliabilitySummary={
+      strong:predictions.filter(p=>p.reliability?.evidenceLevel==="Strong").length,
+      moderate:predictions.filter(p=>p.reliability?.evidenceLevel==="Moderate").length,
+      limited:predictions.filter(p=>p.reliability?.evidenceLevel==="Limited").length,
+      conflicting:predictions.filter(p=>p.reliability?.evidenceLevel==="Conflicting").length,
+      averageScore:predictions.length?Math.round(predictions.reduce((sum,p)=>sum+(Number(p.reliabilityScore)||0),0)/predictions.length):null
+    };
     const existing=await readPersistentArchive(requestedDate,requestedSport)||{date:requestedDate,sport:requestedSport,predictions:[],results:[]};
     existing.predictions=predictions.slice(0,10);
     const newOddsSnapshot=extractOddsSnapshot(predictions);
@@ -1300,7 +1308,7 @@ app.post("/api/predictions/analyze",requirePaid,async(req,r)=>{
     existing.savedAt=existing.savedAt||existing.updatedAt;
     existing.criteria={sport:requestedSport,date:requestedDate,leagues:leagueFilters,marketTypes,selections,maxGames,minConfidence};
     await writePersistentArchive(requestedDate,existing,requestedSport);
-    r.json({ok:true,sport:requestedSport,source:"SportyBet markets + independent statistics",generatedAt:new Date().toISOString(),criteria:{sport:requestedSport,date:requestedDate,leagues:leagueFilters,marketTypes,selections,maxGames,minConfidence},scannedFixtures,fixturesWithMarkets,availableMarkets,qualifyingFixtures:qualified.length,total:predictions.length,available:qualified.length,independentStatsApplied:predictions.some(x=>x.independentConfidence!=null),predictions});
+    r.json({ok:true,sport:requestedSport,source:"SportyBet markets + independent statistics",reliabilityVersion:"evidence-ensemble-v1",reliabilitySummary,generatedAt:new Date().toISOString(),criteria:{sport:requestedSport,date:requestedDate,leagues:leagueFilters,marketTypes,selections,maxGames,minConfidence},scannedFixtures,fixturesWithMarkets,availableMarkets,qualifyingFixtures:qualified.length,total:predictions.length,available:qualified.length,independentStatsApplied:predictions.some(x=>x.independentConfidence!=null),predictions});
   }catch(e){r.status(502).json({ok:false,error:e.message,total:0,available:0,predictions:[]})}
 });
 
