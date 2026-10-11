@@ -354,11 +354,11 @@ function directWinningSelectionRequested(outcome,requested){
   if(req==="away"||req==="2"||req==="player 2") return raw==="away"||raw==="2"||raw.includes("away team");
   return raw===req;
 }
-function confidenceForOutcome(market,outcome){
+function confidenceForOutcome(market,outcome,floor=50){
   const active=market.outcomes.filter(o=>o.isActive!==false&&Number.isFinite(Number(o.odds))&&Number(o.odds)>1);
   if(!active.length||!Number.isFinite(outcome.odds)||outcome.odds<=1) return 0;
   const inv=1/outcome.odds,total=active.reduce((s,o)=>s+1/o.odds,0),normalized=total?inv/total:inv;
-  return Math.round(Math.max(50,Math.min(99,normalized*100)));
+  return Math.round(Math.max(floor,Math.min(99,normalized*100)));
 }
 
 function qualityGrade(p){
@@ -1266,7 +1266,7 @@ app.post("/api/predictions/analyze",requirePaid,async(req,r)=>{
           for(const outcome of market.outcomes){
             if(outcome.isActive===false||!Number.isFinite(Number(outcome.odds))||Number(outcome.odds)<=1) continue;
             if(selections.length&&!selections.some(s=>selectionRequested(outcome,s,market,type))) continue;
-            const confidence=confidenceForOutcome(market,outcome);
+            const confidence=confidenceForOutcome(market,outcome,0);
             if(confidence<minConfidence) continue;
             results.push({
               id:fixture.eventId+"_"+market.marketId+"_"+(market.specifier||"")+"_"+outcome.outcomeId,
