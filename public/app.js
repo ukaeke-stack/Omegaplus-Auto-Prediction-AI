@@ -123,7 +123,9 @@ function renderHistory(date=historySelectedDate(),rows=[]){
     return;
   }
   box.innerHTML=h.map(x=>{
-    const teams=safe(x.home)+" vs "+safe(x.away);\n    const outcomeLabel=String(x.outcome||"Pending");\n    const outcomeKey=/^won$/i.test(outcomeLabel)?"won":/^lost$/i.test(outcomeLabel)?"lost":/^void(?:ed)?$/i.test(outcomeLabel)?"void":"pending";
+    const teams=safe(x.home)+" vs "+safe(x.away);
+    const outcomeLabel=String(x.outcome||"Pending");
+    const outcomeKey=/^won$/i.test(outcomeLabel)?"won":/^lost$/i.test(outcomeLabel)?"lost":/^void(?:ed)?$/i.test(outcomeLabel)?"void":"pending";
     const rawPick=String(x.pick||x.selection||x.market||"");
     const pick=safe(rawPick);
     const odds=x.odds==null?"—":safe(x.odds);
