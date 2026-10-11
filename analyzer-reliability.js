@@ -37,7 +37,7 @@ export function assessPredictionReliability(prediction = {}) {
   const sources = sourceList(prediction);
   const independent = finite(prediction.independentConfidence);
   const market = finite(prediction.marketConfidence ?? prediction.confidence);
-  const model = finite(prediction.modelProbability);
+  const model = prediction.derivedModel ? finite(prediction.derivedModel.modelProbability) : finite(prediction.modelProbability);
   const agreement = finite(prediction.modelAgreement);
   const applicable = marketModelApplies(prediction);
   const hasStats = sources.length > 0 && independent !== null;
