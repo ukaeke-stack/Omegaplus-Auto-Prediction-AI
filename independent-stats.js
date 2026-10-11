@@ -152,6 +152,7 @@ async function independentStatsForFixture(fixture){
   const season=seasonStart(date),ud=await understatLeagueData(fixture.league,season);
   const uh=understatTeamSummary(ud,fixture.home),ua=understatTeamSummary(ud,fixture.away);
   const form=homeRecent&&awayRecent?{
+    homeMatches:homeRecent.matches,awayMatches:awayRecent.matches,
     homeWinRate:homeRecent.winRate,awayWinRate:awayRecent.winRate,
     homeOver15:homeRecent.over15Rate,awayOver15:awayRecent.over15Rate,
     homeOver25:homeRecent.over25Rate,awayOver25:awayRecent.over25Rate,
@@ -175,6 +176,11 @@ async function independentStatsForFixture(fixture){
 function poissonPmf(lambda,k){if(!Number.isFinite(lambda)||lambda<0)return 0;let p=Math.exp(-lambda);for(let i=1;i<=k;i++)p*=lambda/i;return p}
 function poissonOver(lambda,line){let s=0;const max=Math.max(12,Math.ceil(lambda+10));for(let k=0;k<=max;k++)if(k<=line)s+=poissonPmf(lambda,k);return clamp(1-s,0,1)}
 function buildIndependentModels({form,uh,ua,shots}){
+  const hasForm=Number.isFinite(Number(form?.homeGoalsFor))&&Number.isFinite(Number(form?.awayGoalsFor));
+  const hasXg=[uh?.xg,ua?.xg,uh?.xga,ua?.xga].every(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v)));
+  if(!hasForm&&!hasXg){
+    return {expectedGoals:null,probabilities:null,strengthSignals:{recentForm:null,xgEdge:null},modelAgreement:null,methodology:"No valid independent inputs; model probabilities withheld rather than synthesized."};
+  }
   const hx=Number(uh?.xg),ax=Number(ua?.xg),hxa=Number(uh?.xga),axa=Number(ua?.xga);
   const homeGoals=(Number.isFinite(hx)&&Number.isFinite(axa))?(hx+axa)/2:(Number.isFinite(form?.homeGoalsFor)?form.homeGoalsFor:null);
   const awayGoals=(Number.isFinite(ax)&&Number.isFinite(hxa))?(ax+hxa)/2:(Number.isFinite(form?.awayGoalsFor)?form.awayGoalsFor:null);
