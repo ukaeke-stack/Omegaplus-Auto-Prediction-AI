@@ -138,8 +138,17 @@ function understatTeamSummary(data,teamName){
   const avg=(field)=>{const vals=h.map(x=>Number(x[field])).filter(Number.isFinite);return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null};
   return{xg:avg("xG"),xga:avg("xGA"),npxg:avg("npxG"),npxga:avg("npxGA"),shots:avg("shots"),deep:avg("deep"),wins:h.filter(x=>Number(x.wins)>0).length};
 }
-async function independentStatsForFixture(fixture){
+async function independentStatsForFixture(fixture,sport="football"){
   const date=new Date(fixture.startTimeMs).toLocaleDateString("en-CA",{timeZone:"Africa/Lagos"});
+  if(sport!=="football"){
+    return {
+      available:[],
+      date,
+      sofascore:{eventId:null,form:null,stats:null,lineups:null,injuries:{home:null,away:null}},
+      understat:{home:null,away:null},
+      models:{expectedGoals:null,probabilities:null,strengthSignals:{recentForm:null,xgEdge:null},modelAgreement:null,methodology:"Football-only xG and goal models are not applied to non-football sports."}
+    };
+  }
   const sofa=await findSofaEvent(fixture);
   let homeRecent=null,awayRecent=null,sofaStats={},lineups=null,injuries={home:null,away:null};
   if(sofa.found){
@@ -220,9 +229,9 @@ function independentConfidence(stats,type){
   }
   return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):null;
 }
-export async function enrichPredictions(predictions,{concurrency=MAX_CONCURRENCY}={}){
+export async function enrichPredictions(predictions,{concurrency=MAX_CONCURRENCY,sport="football"}={}){
   const enriched=await mapLimit(predictions,concurrency,async p=>{
-    const stats=await independentStatsForFixture(p);
+    const stats=await independentStatsForFixture(p,sport);
     const type=p.marketType==="ou"&&/^over\s*1\.5$/i.test(p.pick)?"over1.5":
       p.marketType==="ou"&&/^over\s*2\.5$/i.test(p.pick)?"over2.5":
       p.marketType==="btts"?"btts":/home/i.test(p.pick)?"home":/away/i.test(p.pick)?"away":null;
