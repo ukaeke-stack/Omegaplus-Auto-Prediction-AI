@@ -626,7 +626,7 @@ app.post("/api/auth/forgot-password",async(req,r)=>{
   const email=String(req.body?.email||"").trim().toLowerCase();
   try{
     const apiKey=process.env.RESEND_API_KEY||"",from=process.env.PASSWORD_RESET_FROM||"",base=String(process.env.APP_BASE_URL||"").replace(/\/$/,"");
-    if(!apiKey||!from||!base){console.warn("Password reset email is not configured; set RESEND_API_KEY, PASSWORD_RESET_FROM, and APP_BASE_URL.");return r.json({ok:true,message:"If an account exists for that email, a password reset link will be sent shortly."})}
+    if(!apiKey||!from||!base){console.warn("Password reset email is not configured; set RESEND_API_KEY, PASSWORD_RESET_FROM, and APP_BASE_URL.");return r.status(503).json({ok:false,error:"Password recovery email is not configured yet. Please contact support."})}
     const request=await createPasswordResetRequest(email);
     if(request){
       const link=base+"/?resetPassword="+encodeURIComponent(request.token);
