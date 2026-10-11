@@ -721,15 +721,35 @@ async function getDayFixtures(date,force=false,sport="football"){
 app.get("/api/scan",async(req,r)=>{
   try{const sport=String(req.query.sport||"football");const date=String(req.query.date||localDayKey(Date.now()));const x=await getDayFixtures(date,true,sport);r.json({ok:true,date,sport,cached:false,scannedAt:x.scannedAt,fixtureCount:x.fixtures.length,leagues:[...new Set(x.fixtures.map(f=>f.league).filter(Boolean))].sort(sortLeagues)});}catch(e){r.status(502).json({ok:false,error:e.message})}
 });
+function archiveTeamTokens(value){
+  const raw=resultNorm(value);
+  if(!raw)return [];
+  // Explicit, conservative aliases for common provider naming differences.
+  // Keep these narrow so similarly named reserve/youth teams do not collapse together.
+  const aliases=[
+    [/^(?:como|como 1907)$/, "como"],
+    [/^(?:cologne|koln|1 fc koln|fc koln|1 koln)$/, "koln"],
+    [/^(?:borussia monchengladbach|borussia m gladbach|monchengladbach|m gladbach|gladbach)$/, "gladbach"],
+    [/^(?:real betis|betis)$/, "betis"]
+  ];
+  for(const [pattern,canonical] of aliases)if(pattern.test(raw))return [canonical];
+  return raw.split(" ").filter(t=>t&&!["fc","cf","sc","afc","club","football","soccer","the","de","del","la","da","do"].includes(t));
+}
 function archiveTeamScore(a,b){
-  const x=resultNorm(a).split(" ").filter(t=>t&&!["fc","cf","sc","afc","club","football","soccer","the"].includes(t));
-  const y=resultNorm(b).split(" ").filter(t=>t&&!["fc","cf","sc","afc","club","football","soccer","the"].includes(t));
+  const x=archiveTeamTokens(a),y=archiveTeamTokens(b);
   if(!x.length||!y.length)return 0;
   const xs=x.join(" "),ys=y.join(" ");
   if(xs===ys)return 1;
-  if(xs.includes(ys)||ys.includes(xs))return Math.min(xs.length,ys.length)/Math.max(xs.length,ys.length)+0.12;
+  // Permit extra club-prefix tokens only when every token of the shorter name
+  // is present in the longer name; avoid broad substring matches.
+  const shorter=x.length<=y.length?x:y,longer=x.length<=y.length?y:x;
+  if(shorter.every(t=>longer.includes(t))){
+    const coverage=shorter.length/longer.length;
+    if(coverage>=0.5)return 0.72+0.27*coverage;
+  }
   const common=x.filter(t=>y.includes(t)).length;
-  return common/Math.max(1,new Set([...x,...y]).size);
+  const dice=(2*common)/Math.max(1,x.length+y.length);
+  return dice>=0.8?dice:0;
 }
 function matchArchiveResult(p,results,date){
   // Provider IDs are not globally interchangeable. Validate teams and local date
@@ -768,7 +788,7 @@ function serverSettlePrediction(p,result){
   if(/postpon/.test(status))return "Postponed";
   if(/cancel|void|abandon/.test(status))return "Void";
   if(!/finished|full time|ended|complete|\bft\b|final|after extra|penalt/.test(status))return "Pending";
-  if(!["confirmed","single-source"].includes(String(result.verificationStatus||"")))return "Pending";
+  // A finished, score-bearing single-source result is usable; disagreements/unverified rows remain pending.\n  if(!["confirmed","single-source"].includes(String(result.verificationStatus||"")))return "Pending";
   if(result.homeScore===null||result.homeScore===undefined||result.homeScore===""||result.awayScore===null||result.awayScore===undefined||result.awayScore===""||!Number.isFinite(Number(result.homeScore))||!Number.isFinite(Number(result.awayScore)))return "Pending";
   const hs=Number(result.homeScore),as=Number(result.awayScore),total=hs+as;
   const pick=String(p.pick||p.selection||p.bestScore?.score||p.bestScore?.label||p.bestScore?.result||"").toLowerCase();
