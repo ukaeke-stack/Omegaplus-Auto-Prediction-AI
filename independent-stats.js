@@ -26,7 +26,7 @@ async function fetchJson(url,headers={}){
 }
 async function cachedJson(cacheKey,url,headers={}){
   const hit=cache.get(cacheKey);
-  if(hit&&Date.now()-hit.at<CACHE_TTL)return{data:hit.data,cached:true};
+  if(hit&&Date.now()-hit.at<CACHE_TTL)return{data:hit.data,cached:true,stale:Boolean(hit.failed),error:hit.error||null};
   try{
     const data=await fetchJson(url,headers);
     cache.set(cacheKey,{at:Date.now(),data});
@@ -246,8 +246,13 @@ export async function enrichPredictions(predictions,{concurrency=MAX_CONCURRENCY
   return enriched;
 }
 export async function independentHealth(){
-  const out={sofascore:false,understat:false};
-  try{await cachedJson("health:sofa",SOFASCORE_BASE+"/sport/football/scheduled-events/"+new Date().toISOString().slice(0,10));out.sofascore=true}catch{}
-  try{await cachedJson("health:understat","https://understat.com/getLeagueData/EPL/"+seasonStart(new Date().toISOString().slice(0,10)),{"X-Requested-With":"XMLHttpRequest","Referer":UNDERSTAT_BASE});out.understat=true}catch{}
+  const date=new Date().toISOString().slice(0,10);
+  const out={sofascore:false,understat:false,checkedAt:new Date().toISOString(),details:{}};
+  const sofa=await cachedJson("health:sofa",SOFASCORE_BASE+"/sport/football/scheduled-events/"+date);
+  out.sofascore=Array.isArray(sofa.data?.events);
+  out.details.sofascore={available:out.sofascore,cached:Boolean(sofa.cached),stale:Boolean(sofa.stale),error:sofa.error||null};
+  const under=await cachedJson("health:understat","https://understat.com/getLeagueData/EPL/"+seasonStart(date),{"X-Requested-With":"XMLHttpRequest","Referer":UNDERSTAT_BASE});
+  out.understat=Boolean(under.data?.teams&&Object.keys(under.data.teams).length);
+  out.details.understat={available:out.understat,cached:Boolean(under.cached),stale:Boolean(under.stale),error:under.error||null};
   return out;
 }
