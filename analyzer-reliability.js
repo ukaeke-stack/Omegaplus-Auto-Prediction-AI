@@ -90,7 +90,17 @@ export function assessPredictionReliability(prediction = {}) {
 export function rankByReliability(predictions = []) {
   return [...predictions].map(prediction => {
     const reliability = assessPredictionReliability(prediction);
-    return { ...prediction, reliability, reliabilityScore: reliability.reliabilityScore };
+    const grade = reliability.evidenceLevel === "Conflicting" ? "D" :
+        reliability.evidenceLevel === "Strong" && reliability.reliabilityScore >= 80 ? "A" :
+        reliability.evidenceLevel === "Moderate" && reliability.reliabilityScore >= 70 ? "B" :
+        reliability.reliabilityScore >= 60 ? "C" : "D";
+      return {
+        ...prediction,
+        reliability,
+        reliabilityScore: reliability.reliabilityScore,
+        qualityGrade: grade,
+        reasons: [...(Array.isArray(prediction.reasons) ? prediction.reasons : []), ...reliability.notes]
+      };
   }).sort((a, b) =>
     b.reliabilityScore - a.reliabilityScore ||
     (Number(b.confidence) || 0) - (Number(a.confidence) || 0) ||
