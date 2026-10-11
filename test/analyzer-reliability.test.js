@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assessPredictionReliability, rankByReliability } from "./analyzer-reliability.js";
+import { assessPredictionReliability, rankByReliability } from "../analyzer-reliability.js";
+import { enrichPredictions } from "../independent-stats.js";
 
 test("missing independent evidence is explicitly limited", () => {
   const result = assessPredictionReliability({ confidence: 82, marketConfidence: 82, marketType: "ou", pick: "Over 1.5" });
@@ -40,4 +41,16 @@ test("ranking is stable for equal scores and does not mutate input", () => {
   const ranked = rankByReliability(input);
   assert.equal(input[0].reliability, undefined);
   assert.equal(ranked[0].id, "strong");
+});
+
+test("non-football predictions do not receive football xG/form model outputs", async () => {
+  const [prediction] = await enrichPredictions([{
+    id: "basketball-1", home: "Team A", away: "Team B",
+    startTimeMs: Date.parse("2026-10-12T12:00:00Z"),
+    marketType: "basketball_total", pick: "Over 145.5",
+    confidence: 76, odds: 1.7
+  }], { sport: "basketball", concurrency: 1 });
+  assert.deepEqual(prediction.independentSources, []);
+  assert.equal(prediction.modelProbability, null);
+  assert.equal(prediction.independentConfidence, null);
 });
