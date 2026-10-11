@@ -391,7 +391,7 @@ function predictionReasons(p){
   return reasons;
 }
 function decoratePredictions(rows){
-  return (Array.isArray(rows)?rows:[]).map(p=>({...p,modelProbability:p.independentConfidence!=null&&Number.isFinite(Number(p.independentConfidence))?Number(p.independentConfidence):Number(p.marketConfidence??p.confidence??0),qualityGrade:qualityGrade(p),reasons:predictionReasons(p)}));
+  return (Array.isArray(rows)?rows:[]).map(p=>({...p,modelProbability:p.modelProbability!==null&&p.modelProbability!==undefined&&Number.isFinite(Number(p.modelProbability))?Number(p.modelProbability):(p.independentConfidence!=null&&Number.isFinite(Number(p.independentConfidence))?Number(p.independentConfidence):Number(p.marketConfidence??p.confidence??0)),qualityGrade:qualityGrade(p),reasons:predictionReasons(p)}));
 }
 function marketLine(value){
   const s=String(value||"").toLowerCase();
