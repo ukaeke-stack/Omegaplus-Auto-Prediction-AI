@@ -229,7 +229,7 @@ function independentConfidence(stats,type){
   }
   return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):null;
 }
-export async function enrichPredictions(predictions,{concurrency=MAX_CONCURRENCY,sport="football"}={}){
+export async function enrichPredictions(predictions,{concurrency=MAX_CONCURRENCY,sport="football",confidenceFloor=50}={}){
   const enriched=await mapLimit(predictions,concurrency,async p=>{
     const stats=await independentStatsForFixture(p,sport);
     const type=p.marketType==="ou"&&/^over\s*1\.5$/i.test(p.pick)?"over1.5":
@@ -241,7 +241,7 @@ export async function enrichPredictions(predictions,{concurrency=MAX_CONCURRENCY
     const modelSignal=type==="home"?modelHome:type==="away"?stats.models?.probabilities?.away:type==="btts"?stats.models?.probabilities?.btts:type==="over1.5"?stats.models?.probabilities?.over15:type==="over2.5"?stats.models?.probabilities?.over25:null;
     const ensembleInputs=[market,independent,modelSignal].filter(Number.isFinite);
     const confidence=ensembleInputs.length===1?ensembleInputs[0]:Math.round(ensembleInputs.reduce((a,b)=>a+b,0)/ensembleInputs.length);
-    return{...p,confidence:clamp(confidence,50,99),marketConfidence:market,independentConfidence:independent,modelProbability:modelSignal??null,modelAgreement:stats.models?.modelAgreement??null,independentSources:stats.available,independentStats:stats};
+    return{...p,confidence:clamp(confidence,confidenceFloor,99),marketConfidence:market,independentConfidence:independent,modelProbability:modelSignal??null,modelAgreement:stats.models?.modelAgreement??null,independentSources:stats.available,independentStats:stats};
   });
   return enriched;
 }
