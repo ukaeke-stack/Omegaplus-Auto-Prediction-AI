@@ -176,7 +176,7 @@ async function independentStatsForFixture(fixture){
 function poissonPmf(lambda,k){if(!Number.isFinite(lambda)||lambda<0)return 0;let p=Math.exp(-lambda);for(let i=1;i<=k;i++)p*=lambda/i;return p}
 function poissonOver(lambda,line){let s=0;const max=Math.max(12,Math.ceil(lambda+10));for(let k=0;k<=max;k++)if(k<=line)s+=poissonPmf(lambda,k);return clamp(1-s,0,1)}
 function buildIndependentModels({form,uh,ua,shots}){
-  const hasForm=Number.isFinite(Number(form?.homeGoalsFor))&&Number.isFinite(Number(form?.awayGoalsFor));
+  const hasForm=Number(form?.homeMatches)>=5&&Number(form?.awayMatches)>=5&&Number.isFinite(Number(form?.homeGoalsFor))&&Number.isFinite(Number(form?.awayGoalsFor));
   const hasXg=[uh?.xg,ua?.xg,uh?.xga,ua?.xga].every(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v)));
   if(!hasForm&&!hasXg){
     return {expectedGoals:null,probabilities:null,strengthSignals:{recentForm:null,xgEdge:null},modelAgreement:null,methodology:"No valid independent inputs; model probabilities withheld rather than synthesized."};
