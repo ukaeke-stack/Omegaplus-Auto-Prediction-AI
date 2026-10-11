@@ -1285,40 +1285,6 @@ app.post("/api/predictions/analyze",requirePaid,async(req,r)=>{
 });
 
 
-function serverSettlePrediction(p,result){
-  if(!result||!Number.isFinite(Number(result.homeScore))||!Number.isFinite(Number(result.awayScore))) return "Pending";
-  const status=String(result.status||"").toLowerCase();
-  if(/postpon|cancel|void|abandon/.test(status)) return /postpon|cancel|void/.test(status)?"Postponed":"Pending";
-  if(!/finished|full time|ended|complete|ft|final/.test(status)) return "Pending";
-  const hs=Number(result.homeScore),as=Number(result.awayScore),total=hs+as,pick=String(p.pick||"").toLowerCase();
-  const over=pick.match(/over\s*(\d+(?:\.\d+)?)/),under=pick.match(/under\s*(\d+(?:\.\d+)?)/);
-  if(over) return total>Number(over[1])?"Won":"Lost";
-  if(under) return total<Number(under[1])?"Won":"Lost";
-  if(result.verificationStatus!=="confirmed") return "Pending";
-  if(p.marketType==="btts"||/btts/.test(pick)){
-    const yes=/yes|gg|both.*score/.test(pick),actual=hs>0&&as>0;
-    return actual===yes?"Won":"Lost";
-  }
-  if(p.marketType==="basketball_moneyline"){ if(/home|1/.test(pick)) return hs>as?"Won":"Lost"; if(/away|2/.test(pick)) return as>hs?"Won":"Lost"; }
-  if(p.marketType==="double_chance"){
-    if(/home or draw|1x/.test(pick)) return hs>=as?"Won":"Lost";
-    if(/home or away|12/.test(pick)) return hs!==as?"Won":"Lost";
-    if(/draw or away|x2/.test(pick)) return as>=hs?"Won":"Lost";
-  }
-  if(p.marketType==="team_total"){
-    const hm=pick.match(/home\s*over\s*(\d+(?:\.\d+)?)/),am=pick.match(/away\s*over\s*(\d+(?:\.\d+)?)/);
-    if(hm)return hs>Number(hm[1])?"Won":"Lost"; if(am)return as>Number(am[1])?"Won":"Lost";
-  }
-  if(p.marketType==="1x2"){
-    if(/home|1x2.*1|\b1\b/.test(pick)) return hs>as?"Won":"Lost";
-    if(/away|1x2.*2|\b2\b/.test(pick)) return as>hs?"Won":"Lost";
-    if(/draw|tie|x/.test(pick)) return hs===as?"Won":"Lost";
-  }
-  if(/home/.test(pick)&&!/handicap/.test(pick)) return hs>as?"Won":"Lost";
-  if(/away/.test(pick)&&!/handicap/.test(pick)) return as>hs?"Won":"Lost";
-  if(/draw/.test(pick)) return hs===as?"Won":"Lost";
-  return "Pending";
-}
 function dateListInclusive(from,to){
   const out=[],d=new Date(from+"T12:00:00"),end=new Date(to+"T12:00:00");
   while(d<=end&&out.length<31){out.push(localDayKey(d.getTime()));d.setDate(d.getDate()+1)}
