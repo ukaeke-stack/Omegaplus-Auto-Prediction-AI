@@ -315,12 +315,12 @@ function renderRows(){
     const selected=state.analyzerSelected.has(x.id);
     return '<article class="match"><div><div class="meta">'+esc(x.league)+' · '+esc(x.time)+'</div><div class="teams">'+esc(x.home)+' <span>vs</span> '+esc(x.away)+'</div><div class="pick"><span>'+esc(x.market)+' · '+esc(x.specifier||"")+'</span><b>'+esc(x.pick)+'</b></div><div class="pick"><span>Odds '+esc(x.odds)+'</span><b>'+esc(x.confidenceLabel)+' · Grade '+esc(x.qualityGrade||"—")+'</b></div>'+predictionReasonsHtml(x)+'<button class="select '+(selected?"selected":"")+'" data-id="'+esc(x.id)+'">'+(selected?"Selected for slip":"Select for slip")+'</button></div><div class="prob"><strong>'+esc(x.confidence)+'%</strong><div class="bar"><i style="width:'+esc(x.confidence)+'%"></i></div><small>Confidence</small></div></article>';
   }).join("");
-  $(".select[data-id]").forEach(b=>b.onclick=()=>{const row=state.rows.find(x=>x.id===b.dataset.id);if(!row)return;if(state.analyzerSelected.has(row.id))state.analyzerSelected.delete(row.id);else state.analyzerSelected.set(row.id,{...row,sport:state.sport});renderRows()});
+  $$(".select[data-id]").forEach(b=>b.onclick=()=>{const row=state.rows.find(x=>x.id===b.dataset.id);if(!row)return;if(state.analyzerSelected.has(row.id))state.analyzerSelected.delete(row.id);else state.analyzerSelected.set(row.id,{...row,sport:state.sport});renderRows()});
 }
 function renderSlip(){
   const rows=[...state.selected.values()];$("#slipCount").textContent=rows.length;$("#selectedHome").textContent=rows.length;
   $("#slip").innerHTML=rows.length?rows.map(x=>'<div class="slipitem"><b>'+esc(x.home)+' vs '+esc(x.away)+'</b><small>'+esc(x.date?prettyDate(x.date):"Date unavailable")+' · '+esc(x.pick)+' · '+esc(x.confidence)+'% · @'+esc(x.odds)+'</small><button class="slip-remove" data-remove-slip="'+esc(x.id)+'" type="button" aria-label="Remove '+esc(x.home)+' versus '+esc(x.away)+'">Remove</button></div>').join(""):"<p>Select analyzed matches, then press Hold Slip to save them on this device.</p>";
-  $("#slip [data-remove-slip]").forEach(b=>b.onclick=()=>{state.selected.delete(b.dataset.removeSlip);renderRows();renderSlip()});
+  $$("#slip [data-remove-slip]").forEach(b=>b.onclick=()=>{state.selected.delete(b.dataset.removeSlip);renderRows();renderSlip()});
   if($("#slipStatus"))$("#slipStatus").textContent=rows.length?"Press Hold Slip to save · "+rows.length+" selection(s)":"Your slip is empty.";
 }
 async function analyze(){
