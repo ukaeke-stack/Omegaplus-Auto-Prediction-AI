@@ -319,7 +319,7 @@ function renderRows(){
 }
 function renderSlip(){
   const rows=[...state.selected.values()];$("#slipCount").textContent=rows.length;$("#selectedHome").textContent=rows.length;
-  $("#slip").innerHTML=rows.length?rows.map(x=>'<div class="slipitem"><b>'+esc(x.home)+' vs '+esc(x.away)+'</b><small>'+esc(x.date?prettyDate(x.date):"Date unavailable")+' · '+esc(x.pick)+' · '+esc(x.confidence)+'% · @'+esc(x.odds)+'</small><button class="slip-remove" data-remove-slip="'+esc(x.id)+'" type="button" aria-label="Remove '+esc(x.home)+' versus '+esc(x.away)+'">Remove</button></div>').join(""):"<p>Select analyzed matches to build your slip. Your slip stays saved when you change dates.</p>";
+  $("#slip").innerHTML=rows.length?rows.map(x=>'<div class="slipitem"><b>'+esc(x.home)+' vs '+esc(x.away)+'</b><small>'+esc(x.date?prettyDate(x.date):"Date unavailable")+' · '+esc(x.pick)+' · '+esc(x.confidence)+'% · @'+esc(x.odds)+'</small><button class="slip-remove" data-remove-slip="'+esc(x.id)+'" type="button" aria-label="Remove '+esc(x.home)+' versus '+esc(x.away)+'">Remove</button></div>').join(""):"<p>Select analyzed matches, then press Hold Slip to save them on this device.</p>";
   $("#slip [data-remove-slip]").forEach(b=>b.onclick=()=>{state.selected.delete(b.dataset.removeSlip);renderRows();renderSlip()});
   if($("#slipStatus"))$("#slipStatus").textContent=rows.length?"Press Hold Slip to save · "+rows.length+" selection(s)":"Your slip is empty.";
 }
@@ -474,7 +474,7 @@ function resetDailyState(){
   const today=dateKey(new Date());
   if(today===appDay)return;
   appDay=today;
-  state.date=today;state.dates=new Set([today]);state.rows=[];
+  state.date=today;state.dates=new Set([today]);state.rows=[];state.analyzerSelected.clear();
   $("#fixtureDate").value=today;$("#calendarDate").value=today;$("#selectedDateMetric").textContent=today.slice(5).replace("-","/");
   renderDateChips();renderRows();renderSlip();
   loadLeagues();loadBase();
@@ -482,7 +482,7 @@ function resetDailyState(){
 }
 function prepareDailyPage(){
   const today=dateKey(new Date());
-  if(state.date!==today){appDay=today;state.date=today;state.dates=new Set([today]);state.rows=[];$("#fixtureDate").value=today;$("#calendarDate").value=today;$("#selectedDateMetric").textContent=today.slice(5).replace("-","/");renderDateChips();renderRows();renderSlip();loadLeagues();loadBase()}
+  if(state.date!==today){appDay=today;state.date=today;state.dates=new Set([today]);state.rows=[];state.analyzerSelected.clear();$("#fixtureDate").value=today;$("#calendarDate").value=today;$("#selectedDateMetric").textContent=today.slice(5).replace("-","/");renderDateChips();renderRows();renderSlip();loadLeagues();loadBase()}
   loadDailyBest();
 }
 window.renderHistory=renderHistory;
