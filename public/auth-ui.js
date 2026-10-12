@@ -9,6 +9,8 @@ style.textContent=`
 #omegaSideProfile #omegaSideLogout{background:#111c16}#omegaSideProfile #omegaSideAccount{background:#0a1a11}
 #omegaSideAuth[hidden],#omegaSideProfile[hidden]{display:none!important}\n.history-item .outcome-indicator{display:inline-block!important;padding:6px 10px;border-radius:999px;font-size:13px;font-weight:800;text-align:center}\n.history-item .outcome-won{color:#062a14!important;background:#18e76b!important}\n.history-item .outcome-lost{color:#fff!important;background:#e53935!important}\n.history-item .outcome-pending{color:#332600!important;background:#ffd54f!important}\n.history-item .outcome-void{color:#fff!important;background:#454b48!important}
 .topbar{height:68px!important;min-height:68px;padding:7px 12px!important;gap:8px;display:flex;align-items:center;background:rgba(4,11,7,.96);backdrop-filter:blur(14px);border-bottom:1px solid #17271f}
+@media(max-width:600px){.topbar{margin-top:8px!important;}}
+
 .topbar .menu-btn{order:0;flex:0 0 42px;width:42px;height:42px;min-width:42px;margin:0;border:1px solid #20342a;border-radius:10px;background:#0e1b14;color:#eef5f0;font-size:25px;display:grid;place-items:center}
 .toolbar-grip{order:1;flex:0 0 28px;width:28px;height:42px;padding:0;border:0;background:transparent;color:#77877d;font-size:20px;touch-action:none;cursor:grab}
 .top-brand{order:2;flex:1;min-width:0;gap:7px}.topbar .logo{width:40px;height:40px;flex:0 0 40px;border-radius:11px;font-size:21px}
