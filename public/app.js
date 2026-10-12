@@ -457,7 +457,7 @@ $("#clearAll").onclick=()=>{
 $("#holdSlip").onclick=()=>{
   let added=0;for(const row of state.analyzerSelected.values()){if(state.selected.has(row.id))continue;if(state.selected.size>=50)break;state.selected.set(row.id,{...row,sport:state.sport});added++}
   state.analyzerSelected.clear();renderRows();renderSlip();
-  const ok=saveSlip();if($("#slipStatus"))$("#slipStatus").textContent=ok?"Slip held and saved on this device · "+state.selected.size+" selection(s)"+(added?" · "+added+" added"):"Could not save the slip on this device.";
+  const ok=saveSlip();if($("#slipStatus"))$("#slipStatus").textContent=ok?"Slip held and saved on this device · "+state.selected.size+" selection(s)"+(added?" · "+added+" added":""):"Could not save the slip on this device.";
 };
 $("#clearSlip").onclick=()=>{state.selected.clear();state.analyzerSelected.clear();try{localStorage.removeItem(slipStorageKey())}catch{};renderRows();renderSlip();$("#bookingResult").hidden=true;if($("#slipStatus"))$("#slipStatus").textContent="Prediction slip cleared.";};
 $("#sporty").onclick=()=>window.open("https://www.sportybet.com/ng/","_blank");
