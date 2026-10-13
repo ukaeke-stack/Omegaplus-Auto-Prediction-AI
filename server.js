@@ -1358,15 +1358,15 @@ app.get("/api/performance",async(req,r)=>{
   }catch(e){r.status(200).json({ok:false,error:e.message,totalPredictions:0,settled:0,won:0,lost:0,accuracy:null,byMarket:{}})}
 });
 
-function snapNormalizeText(value){return normalizeText(String(value||"")).replace(/[^a-z0-9 ]/g," ").replace(/\\s+/g," ").trim()}
+function snapNormalizeText(value){return normalizeText(String(value||"")).replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim()}
 function snapFixtureAnalysis(fixture){
   const markets=[];
   for(const market of (fixture.markets||[])){
     const active=(market.outcomes||[]).filter(o=>o.isActive!==false&&Number(o.odds)>1);
     for(const outcome of active){
       const probability=normalizedMarketProbability(market,outcome);
-      if(!probability)continue;
-      markets.push({eventId:fixture.eventId,home:fixture.home,away:fixture.away,league:fixture.league,startTimeMs:fixture.startTimeMs,market:market.marketName||market.desc||"Market",marketId:String(market.marketId||market.id),specifier:market.specifier||"",outcomeId:String(outcome.outcomeId||outcome.id),pick:outcome.outcomeName||outcome.name||outcome.desc||"Selection",odds:Number(outcome.odds),confidence:Math.round(probability),confidenceLabel:probability>=75?"High":probability>=60?"Moderate":"Lower",impliedProbability:true});
+      if(!Number.isFinite(Number(probability))||Number(probability)<=0)continue;
+      markets.push({eventId:fixture.eventId,home:fixture.home,away:fixture.away,league:fixture.league,startTimeMs:fixture.startTimeMs,market:market.marketName||market.desc||"",marketId:String(market.marketId||market.id||""),specifier:market.specifier||"",outcomeId:String(outcome.outcomeId||outcome.id||""),pick:outcome.outcomeName||outcome.name||outcome.desc||"",odds:Number(outcome.odds),confidence:Math.round(probability),confidenceLabel:probability>=75?"High":probability>=60?"Moderate":"Lower",impliedProbability:true});
     }
   }
   return markets.sort((a,b)=>b.confidence-a.confidence);
@@ -1380,14 +1380,14 @@ app.post("/api/snap-predict/analyze-image",requirePaid,async(req,r)=>{
     const matches=[];
     for(const fixture of fixtures){
       const home=snapNormalizeText(fixture.home),away=snapNormalizeText(fixture.away);
-      if(home.length<4||away.length<4)continue;
-      if(ocr.includes(home)&&ocr.includes(away)){
-        const picks=snapFixtureAnalysis(fixture);
-        if(picks.length)matches.push({fixture:{eventId:fixture.eventId,home:fixture.home,away:fixture.away,league:fixture.league,startTimeMs:fixture.startTimeMs},selected:picks[0],marketOptions:picks.slice(0,8)});
-      }
+      if(home.length<4||away.length<4||/^(unknown|unknown team|sportybet|fixture unavailable)$/i.test(home)||/^(unknown|unknown team|sportybet|fixture unavailable)$/i.test(away))continue;
+      if(!ocr.includes(home)||!ocr.includes(away))continue;
+      const picks=snapFixtureAnalysis(fixture);
+      if(!picks.length)continue;
+      matches.push({...picks[0],marketOptions:picks.slice(0,8),matchConfidence:100,matchMethod:"Exact team-name match"});
     }
-    if(!matches.length)return r.json({ok:true,total:0,matches:[],ocrText:text,message:"OCR completed, but no exact fixture matches were found in the current SportyBet fixture feed. Check the extracted text or try a clearer screenshot."});
-    r.json({ok:true,total:matches.length,matches:matches.slice(0,30),source:"SportyBet live markets",probabilityNote:"Percentages are market-implied probabilities calculated from current odds, not guarantees or independently verified win probabilities."});
+    if(!matches.length)return r.json({ok:true,total:0,matches:[],ocrText:text,message:"The screenshot text was read, but no fixture with both recognizable team names matched the current SportyBet feed. Try a clearer image showing the full team names."});
+    r.json({ok:true,total:matches.length,matches:matches.slice(0,30),source:"SportyBet live markets",probabilityNote:"Percentages are market-implied estimates calculated from current odds, not guarantees or independently verified win probabilities."});
   }catch(e){r.status(502).json({ok:false,error:e.message||"Could not analyze this screenshot."})}
 });
 app.post("/api/snap-predict/booking-code",requirePaid,async(req,r)=>{
