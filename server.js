@@ -1357,6 +1357,76 @@ app.get("/api/performance",async(req,r)=>{
     r.json({ok:true,from,to,days:dates.length,totalPredictions:rows.length,settled:settled.length,won,lost,accuracy:settled.length?Math.round(won/settled.length*100):null,byMarket,byEvidenceLevel,byConfidenceBand});
   }catch(e){r.status(200).json({ok:false,error:e.message,totalPredictions:0,settled:0,won:0,lost:0,accuracy:null,byMarket:{}})}
 });
+
+function snapNormalizeText(value){return normalizeText(String(value||"")).replace(/[^a-z0-9 ]/g," ").replace(/\\s+/g," ").trim()}
+function snapFixtureAnalysis(fixture){
+  const markets=[];
+  for(const market of (fixture.markets||[])){
+    const active=(market.outcomes||[]).filter(o=>o.isActive!==false&&Number(o.odds)>1);
+    for(const outcome of active){
+      const probability=normalizedMarketProbability(market,outcome);
+      if(!probability)continue;
+      markets.push({eventId:fixture.eventId,home:fixture.home,away:fixture.away,league:fixture.league,startTimeMs:fixture.startTimeMs,market:market.marketName||market.desc||"Market",marketId:String(market.marketId||market.id),specifier:market.specifier||"",outcomeId:String(outcome.outcomeId||outcome.id),pick:outcome.outcomeName||outcome.name||outcome.desc||"Selection",odds:Number(outcome.odds),confidence:Math.round(probability),confidenceLabel:probability>=75?"High":probability>=60?"Moderate":"Lower",impliedProbability:true});
+    }
+  }
+  return markets.sort((a,b)=>b.confidence-a.confidence);
+}
+app.post("/api/snap-predict/analyze-image",requirePaid,async(req,r)=>{
+  try{
+    const text=String(req.body?.ocrText||"").slice(0,12000);
+    if(text.trim().length<12)return r.status(400).json({ok:false,error:"The image text could not be read clearly. Try a sharper screenshot or crop the booking slip."});
+    const ocr=snapNormalizeText(text);
+    const fixtures=await getSportyFixtures(false,true,"football");
+    const matches=[];
+    for(const fixture of fixtures){
+      const home=snapNormalizeText(fixture.home),away=snapNormalizeText(fixture.away);
+      if(home.length<4||away.length<4)continue;
+      if(ocr.includes(home)&&ocr.includes(away)){
+        const picks=snapFixtureAnalysis(fixture);
+        if(picks.length)matches.push({fixture:{eventId:fixture.eventId,home:fixture.home,away:fixture.away,league:fixture.league,startTimeMs:fixture.startTimeMs},selected:picks[0],marketOptions:picks.slice(0,8)});
+      }
+    }
+    if(!matches.length)return r.json({ok:true,total:0,matches:[],ocrText:text,message:"OCR completed, but no exact fixture matches were found in the current SportyBet fixture feed. Check the extracted text or try a clearer screenshot."});
+    r.json({ok:true,total:matches.length,matches:matches.slice(0,30),source:"SportyBet live markets",probabilityNote:"Percentages are market-implied probabilities calculated from current odds, not guarantees or independently verified win probabilities."});
+  }catch(e){r.status(502).json({ok:false,error:e.message||"Could not analyze this screenshot."})}
+});
+app.post("/api/snap-predict/booking-code",requirePaid,async(req,r)=>{
+  try{
+    const code=String(req.body?.code||"").trim().replace(/\\s+/g,"");
+    if(!/^[A-Za-z0-9-]{4,40}$/.test(code))return r.status(400).json({ok:false,error:"Enter a valid SportyBet booking code."});
+    const body=await sportyFetch("/orders/share/"+encodeURIComponent(code),{method:"GET"});
+    const data=body.data||{};
+    const legs=Array.isArray(data.outcomes)?data.outcomes:[];
+    if(!legs.length)return r.status(404).json({ok:false,error:"SportyBet returned no selections for this code. Check the code and try again."});
+    const fixtures=await getSportyFixtures(false,true,"football");
+    const matches=[];
+    for(const leg of legs){
+      const eventId=String(leg.eventId||leg.event_id||leg.event?.eventId||"");
+      const fixture=fixtures.find(x=>String(x.eventId)===eventId);
+      const marketId=String(leg.marketId||leg.market_id||leg.market?.id||"");
+      const outcomeId=String(leg.outcomeId||leg.outcome_id||leg.id||"");
+      const market=fixture?.markets?.find(x=>String(x.marketId||x.id)===marketId&&String(x.specifier||"")===String(leg.specifier||""));
+      const outcome=market?.outcomes?.find(x=>String(x.outcomeId||x.id)===outcomeId);
+      const picks=fixture?snapFixtureAnalysis(fixture):[];
+      matches.push({eventId,home:fixture?.home||leg.homeTeamName||leg.home||leg.eventName||"Fixture unavailable",away:fixture?.away||leg.awayTeamName||leg.away||"",league:fixture?.league||leg.tournamentName||"",startTimeMs:fixture?.startTimeMs||null,market:market?.marketName||leg.marketName||leg.marketDesc||"Booked market",pick:outcome?.outcomeName||leg.outcomeName||leg.desc||"Booked selection",odds:Number(outcome?.odds||leg.odds)||null,confidence:outcome&&market?Math.round(normalizedMarketProbability(market,outcome)):null,marketOptions:picks.slice(0,8),selectedMarketId:marketId,selectedOutcomeId:outcomeId,selectedSpecifier:String(leg.specifier||"")});
+    }
+    r.json({ok:true,code,total:matches.length,matches,source:"SportyBet booking-code lookup",probabilityNote:"Percentages are market-implied probabilities calculated from current odds, not guarantees or independently verified win probabilities."});
+  }catch(e){const msg=String(e.message||"");const status=/HTTP 404|not found|invalid booking/i.test(msg)?404:502;r.status(status).json({ok:false,error:status===404?"This SportyBet booking code was not found or has expired.":msg||"Could not retrieve this booking code from SportyBet."})}
+});
+app.post("/api/snap-predict/better-options",requirePaid,async(req,r)=>{
+  try{
+    const ids=new Set((Array.isArray(req.body?.eventIds)?req.body.eventIds:[]).map(String).slice(0,30));
+    if(!ids.size)return r.status(400).json({ok:false,error:"Analyze a booking or image first."});
+    const fixtures=await getSportyFixtures(false,true,"football");
+    const matches=[];
+    for(const fixture of fixtures.filter(x=>ids.has(String(x.eventId)))){
+      const options=snapFixtureAnalysis(fixture).slice(0,12);
+      if(options.length)matches.push({eventId:fixture.eventId,home:fixture.home,away:fixture.away,options});
+    }
+    r.json({ok:true,total:matches.length,matches,source:"Current SportyBet markets",note:"Alternatives are ranked by normalized market-implied probability and current odds. They are not guarantees of winning."});
+  }catch(e){r.status(502).json({ok:false,error:e.message||"Could not find alternatives right now."})}
+});
+
 app.post("/api/booking-code",requirePaid,async(req,r)=>{if(!(await getAdminSettings()).bookingCodeEnabled)return r.status(503).json({ok:false,error:"Booking-code generation is temporarily disabled by the administrator."});try{const selections=Array.isArray(req.body?.selections)?req.body.selections:[],sport=String(req.body?.sport||"football"),target=String(req.body?.bookmaker||"sportybet");if(!selections.length)return r.status(400).json({ok:false,error:"Select at least one analyzed match first."});r.json({ok:true,...await generateTargetBooking(target,selections,sport)})}catch(e){r.status(e.code==="NO_AVAILABLE_SELECTIONS"?409:502).json({ok:false,error:e.message,unavailableSelections:e.unavailable||[]})}});
 
 app.get("/api/daily-rollover",async(req,r)=>{if(process.env.CRON_SECRET&&req.headers.authorization!==`Bearer ${process.env.CRON_SECRET}`)return r.status(401).json({ok:false,error:"Unauthorized"});try{const date=localDayKey(Date.now()),prev=localDayKey(Date.now()-86400000);let prevArchive=await readPersistentArchive(prev);let resultRows=[];try{const rr=await getDateResults(prev,true);if(rr.configured)resultRows=rr.data||[]}catch{}if(!prevArchive||!Array.isArray(prevArchive.predictions)||prevArchive.predictions.length!==10){try{const predictions=await buildDailyBest(prev);prevArchive=prevArchive||{date:prev,predictions:[],results:[]};prevArchive.predictions=predictions;prevArchive.dailySelectionVersion=DAILY_SELECTION_VERSION}catch{}}if(prevArchive){prevArchive.predictions=Array.isArray(prevArchive.predictions)?prevArchive.predictions.slice(0,10):[];prevArchive.results=resultRows;prevArchive.updatedAt=new Date().toISOString();if(!prevArchive.savedAt)prevArchive.savedAt=prevArchive.updatedAt;await writePersistentArchive(prev,prevArchive)}const todayArchive=await readPersistentArchive(date);const predictions=todayArchive?.dailySelectionVersion===DAILY_SELECTION_VERSION&&todayArchive?.predictions?.length===10?todayArchive.predictions:await buildDailyBest(date);const next=todayArchive||{date,predictions:[],results:[]};next.predictions=predictions;next.dailySelectionVersion=DAILY_SELECTION_VERSION;next.updatedAt=new Date().toISOString();if(!next.savedAt)next.savedAt=next.updatedAt;await writePersistentArchive(date,next);r.json({ok:true,date,previousDate:prev,previousResults:resultRows.length,newDailyBest:predictions.length})}catch(e){r.status(500).json({ok:false,error:e.message})}});
