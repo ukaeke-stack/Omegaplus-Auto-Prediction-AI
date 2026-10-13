@@ -1419,8 +1419,10 @@ app.post("/api/snap-predict/better-options",requirePaid,async(req,r)=>{
     if(!ids.size)return r.status(400).json({ok:false,error:"Analyze a booking or image first."});
     const fixtures=await getSportyFixtures(false,true,"football");
     const matches=[];
+    const selected=Array.isArray(req.body?.selections)?req.body.selections:[];
+    const selectedKeys=new Set(selected.map(x=>[String(x.eventId||""),String(x.marketId||""),String(x.specifier||""),String(x.outcomeId||"")].join("|")));
     for(const fixture of fixtures.filter(x=>ids.has(String(x.eventId)))){
-      const options=snapFixtureAnalysis(fixture).slice(0,12);
+      const options=snapFixtureAnalysis(fixture).filter(x=>!selectedKeys.has([String(x.eventId),String(x.marketId),String(x.specifier||""),String(x.outcomeId)].join("|"))).slice(0,8);
       if(options.length)matches.push({eventId:fixture.eventId,home:fixture.home,away:fixture.away,options});
     }
     r.json({ok:true,total:matches.length,matches,source:"Current SportyBet markets",note:"Alternatives are ranked by normalized market-implied probability and current odds. They are not guarantees of winning."});
