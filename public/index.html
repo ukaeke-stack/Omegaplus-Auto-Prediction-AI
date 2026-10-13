@@ -46,7 +46,29 @@
 </div>
 <div class="home-utility-row"><button type="button" data-page="message">✉ Message Admin</button><button type="button" data-page="suggestion">★ Suggestions</button><button type="button" id="homeUpdatesShortcut">↻ Latest Updates</button><a href="/subscription.html">◇ Subscription</a><a href="/privacy.html">⌑ Privacy & Security</a></div>
 </section>
-<section class="snap-card"><button id="snapToggle" class="snap-head"><span class="feature-icon">▣</span><span class="snap-copy"><strong>SNAP PREDICT</strong><small>Upload a fixture screenshot — AI predicts all games</small></span><b class="new-badge">NEW</b><span id="snapArrow">⌄</span></button><div id="snapBody" class="snap-body"><label class="upload-box" for="fixtureFile"><span class="upload-icon">⇧</span><strong>Drop a fixture screenshot here</strong><small>or click to browse · PNG, JPG, WEBP</small><input id="fixtureFile" type="file" accept="image/png,image/jpeg,image/webp"></label><div id="fileName"></div></div></section>
+<section class="snap-card snap-card-v2">
+<button id="snapToggle" class="snap-head"><span class="feature-icon">▣</span><span class="snap-copy"><strong>SNAP PREDICT</strong><small>Analyze booked games from a screenshot or SportyBet code</small></span><b class="new-badge">NEW</b><span id="snapArrow">⌄</span></button>
+<div id="snapBody" class="snap-body open">
+<div class="snap-mode-tabs" role="tablist" aria-label="Snap Predict input method">
+<button type="button" class="snap-mode active" id="snapImageMode" role="tab" aria-selected="true">▧ Upload Image</button>
+<button type="button" class="snap-mode" id="snapCodeMode" role="tab" aria-selected="false">⌗ Booking Code</button>
+</div>
+<div id="snapImagePanel" class="snap-panel">
+<label class="upload-box snap-upload" for="fixtureFile"><span class="upload-icon">⇧</span><strong>Upload a booked-games screenshot</strong><small>PNG, JPG or WEBP · clear text works best</small><input id="fixtureFile" type="file" accept="image/png,image/jpeg,image/webp"></label>
+<div id="fileName" class="snap-file-name">No image selected</div>
+<button id="snapAnalyzeImage" class="primary full snap-action" type="button" disabled>Analyze Games</button>
+<p class="snap-privacy">Image text is read in your browser. The image file itself is not uploaded.</p>
+</div>
+<div id="snapCodePanel" class="snap-panel" hidden>
+<label class="snap-input-label" for="snapBookingCode">SportyBet booking code</label>
+<input id="snapBookingCode" class="snap-code-input" type="text" inputmode="text" autocomplete="off" maxlength="40" placeholder="Paste or type your booking code">
+<button id="snapAnalyzeCode" class="primary full snap-action" type="button">Analyze Booking Code</button>
+<p class="snap-privacy">For now, booking-code lookup supports SportyBet only.</p>
+</div>
+<div id="snapStatus" class="snap-status" role="status" aria-live="polite" hidden></div>
+<div id="snapResults" class="snap-results"></div>
+<div id="snapBetterWrap" hidden><button id="snapBetterOptions" class="secondary full snap-action" type="button">Find Better Options</button><div id="snapBetterResults"></div></div>
+</div></section>
 <section class="live-card"><span class="live-badge">◉ LIVE</span><div><strong>Live market analysis</strong><small>SportyBet fixtures, markets and confidence ranking</small></div></section>
 <section class="stats-row"><div class="metric"><span>Selected Date</span><b id="selectedDateMetric">—</b><em>Fixture day</em><i>▣</i></div><div class="metric"><span>Available Games</span><b id="predictionTotal">—</b><em>Live feed</em><i>◎</i></div></section><section class="stats-row"><div class="metric"><span>Selected</span><b id="selectedHome">0</b><em>Current slip</em><i>◎</i></div><div class="metric"><span>Engine</span><b>LIVE</b><em>Market model</em><i>％</i></div></section>
 <section class="today-picks"><div class="section-head"><div><small>LIVE MARKET SCAN</small><h2>Fixture Analyzer</h2><p>Select <b>multiple leagues</b>, <b>multiple markets</b> and <b>multiple options</b>. Results are ranked by confidence and limited to the exact number requested.</p></div><span class="live-badge">◉ LIVE</span></div>
