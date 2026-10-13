@@ -197,3 +197,7 @@ html,body{background:radial-gradient(ellipse at 80% 0%,#102b39 0%,#071019 42%,#0
 
 /* Snap Predict compact add-to-slip controls for each alternative */
 .snap-alt-right{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex:0 0 auto;white-space:nowrap}.snap-add-option{width:25px;height:25px;min-width:25px;padding:0;display:inline-grid;place-items:center;border:1px solid #315342;border-radius:7px;background:#10271a;color:#75e9a9;font-size:16px;font-weight:900;line-height:1;cursor:pointer}.snap-add-option.selected{background:#18e76b;border-color:#18e76b;color:#04150b}.snap-alt-row{align-items:center}.snap-alt-row>span:first-child{flex:1;min-width:0}
+
+/* Retain original analyzed selections independently from suggested alternatives. */
+.snap-retain-option{display:flex;align-items:center;justify-content:center;width:100%;min-height:36px;margin-top:10px;padding:8px 12px;border:1px solid #315342;border-radius:9px;background:#10271a;color:#8af0b7;font-size:12px;font-weight:800;cursor:pointer}
+.snap-retain-option.selected{background:#18e76b;border-color:#18e76b;color:#04150b}
