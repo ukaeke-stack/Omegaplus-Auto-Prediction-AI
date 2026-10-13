@@ -1359,10 +1359,23 @@ app.get("/api/performance",async(req,r)=>{
 });
 
 function snapNormalizeText(value){return normalizeText(String(value||"")).replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim()}
+function snapBetterMarketAllowed(market){
+  const name=normalizeText(market?.marketName||market?.desc||"");
+  const id=String(market?.marketId||market?.id||"");
+  // Exclude all cards/bookings markets and only expose the requested market families.
+  if(/booking|yellow card|red card|cards?\b/.test(name))return false;
+  if(/corner/.test(name))return true;
+  if(/both teams to score|\bbtts\b/.test(name)||id==="29")return true;
+  if(isDirectWinningMarket(market)||id==="1"||/1x2|match result/.test(name))return true;
+  if(/handicap|spread/.test(name)||["14","16"].includes(id))return true;
+  if((/over|under/.test(name)&&/(goal|total)/.test(name)&&!/team/.test(name))||id==="18")return true;
+  return false;
+}
 function snapFixtureAnalysis(fixture){
   const markets=[];
   for(const market of (fixture.markets||[])){
-    const active=(market.outcomes||[]).filter(o=>o.isActive!==false&&Number(o.odds)>1);
+    if(!snapBetterMarketAllowed(market))continue;
+    const active=(market.outcomes||[]).filter(o=>o.isActive!==false&&Number(o.odds)>=1.10);
     for(const outcome of active){
       const probability=normalizedMarketProbability(market,outcome);
       if(!Number.isFinite(Number(probability))||Number(probability)<=0)continue;
