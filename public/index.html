@@ -54,7 +54,7 @@
 <button type="button" class="snap-mode" id="snapCodeMode" role="tab" aria-selected="false">⌗ Booking Code</button>
 </div>
 <div id="snapImagePanel" class="snap-panel">
-<label class="upload-box snap-upload" for="fixtureFile"><span class="upload-icon">⇧</span><strong>Upload a booked-games screenshot</strong><small>PNG, JPG or WEBP · clear text works best</small><input id="fixtureFile" type="file" accept="image/png,image/jpeg,image/webp"></label>
+<label class="upload-box snap-upload" for="fixtureFile"><img id="snapImagePreview" class="snap-image-preview" alt="Selected booking screenshot preview" hidden><span id="snapUploadIcon" class="upload-icon">⇧</span><strong id="snapUploadTitle">Upload a booked-games screenshot</strong><small id="snapUploadHint">PNG, JPG or WEBP · clear text works best</small><input id="fixtureFile" type="file" accept="image/png,image/jpeg,image/webp"></label>
 <div id="fileName" class="snap-file-name">No image selected</div>
 <button id="snapAnalyzeImage" class="primary full snap-action" type="button" disabled>Analyze Games</button>
 <p class="snap-privacy">Image text is read in your browser. The image file itself is not uploaded.</p>
