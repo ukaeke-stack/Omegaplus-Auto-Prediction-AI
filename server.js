@@ -1384,10 +1384,26 @@ app.post("/api/snap-predict/analyze-image",requirePaid,async(req,r)=>{
       if(!ocr.includes(home)||!ocr.includes(away))continue;
       const picks=snapFixtureAnalysis(fixture);
       if(!picks.length)continue;
-      matches.push({...picks[0],marketOptions:picks.slice(0,8),matchConfidence:100,matchMethod:"Exact team-name match"});
+      const directHome=picks.find(p=>{
+        const market=(fixture.markets||[]).find(m=>String(m.marketId||m.id||"")===String(p.marketId||"")&&String(m.specifier||"")===String(p.specifier||""));
+        const label=snapNormalizeText(p.pick);
+        return market&&isDirectWinningMarket(market)&&(label==="home"||label==="1"||label===home||label===("1 "+home));
+      });
+      const directAway=picks.find(p=>{
+        const market=(fixture.markets||[]).find(m=>String(m.marketId||m.id||"")===String(p.marketId||"")&&String(m.specifier||"")===String(p.specifier||""));
+        const label=snapNormalizeText(p.pick);
+        return market&&isDirectWinningMarket(market)&&(label==="away"||label==="2"||label===away||label===("2 "+away));
+      });
+      const directDraw=picks.find(p=>{
+        const market=(fixture.markets||[]).find(m=>String(m.marketId||m.id||"")===String(p.marketId||"")&&String(m.specifier||"")===String(p.specifier||""));
+        return market&&isDirectWinningMarket(market)&&["draw","x"].includes(snapNormalizeText(p.pick));
+      });
+      const selectionHint=/\baway win\b|\baway\b|\b2\s*x\s*2\b/.test(ocr) ? directAway : /\bdraw\b/.test(ocr) ? directDraw : /\bhome win\b|\bhome\b|direct winning|1x2|match winner/.test(ocr) ? directHome : null;
+      const selected=selectionHint||picks[0];
+      matches.push({...selected,marketOptions:picks.slice(0,8),selectedMarketId:selected.marketId,selectedSpecifier:selected.specifier||"",selectedOutcomeId:selected.outcomeId,matchConfidence:100,matchMethod:"Exact team-name match"});
     }
     if(!matches.length)return r.json({ok:true,total:0,matches:[],ocrText:text,message:"The screenshot text was read, but no fixture with both recognizable team names matched the current SportyBet feed. Try a clearer image showing the full team names."});
-    r.json({ok:true,total:matches.length,matches:matches.slice(0,30),source:"SportyBet live markets",probabilityNote:"Percentages are market-implied estimates calculated from current odds, not guarantees or independently verified win probabilities."});
+    r.json({ok:true,total:matches.length,matches:matches.slice(0,30),source:"SportyBet live markets",probabilityNote:"The displayed chance is an odds-implied estimate for the identified selection (for example, Home win), not a guarantee or independently verified win probability."});
   }catch(e){r.status(502).json({ok:false,error:e.message||"Could not analyze this screenshot."})}
 });
 app.post("/api/snap-predict/booking-code",requirePaid,async(req,r)=>{
