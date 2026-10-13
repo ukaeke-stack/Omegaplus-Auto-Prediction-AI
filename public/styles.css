@@ -194,3 +194,6 @@ html,body{background:radial-gradient(ellipse at 80% 0%,#102b39 0%,#071019 42%,#0
 
 /* Snap Predict upload confirmation and preview */
 .snap-upload{position:relative;cursor:pointer;overflow:hidden}.snap-image-preview{display:block;width:100%;max-height:290px;object-fit:contain;border-radius:10px;background:#050b08;margin:0 auto 8px}.snap-upload input{width:min(100%,280px);font-size:12px}.snap-upload:has(.snap-image-preview:not([hidden])){border-style:solid;border-color:#39c985;background:linear-gradient(145deg,#0d1b14,#101c29)}
+
+/* Snap Predict compact add-to-slip controls for each alternative */
+.snap-alt-right{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex:0 0 auto;white-space:nowrap}.snap-add-option{width:25px;height:25px;min-width:25px;padding:0;display:inline-grid;place-items:center;border:1px solid #315342;border-radius:7px;background:#10271a;color:#75e9a9;font-size:16px;font-weight:900;line-height:1;cursor:pointer}.snap-add-option.selected{background:#18e76b;border-color:#18e76b;color:#04150b}.snap-alt-row{align-items:center}.snap-alt-row>span:first-child{flex:1;min-width:0}
