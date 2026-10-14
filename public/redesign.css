@@ -261,3 +261,68 @@ button:disabled{opacity:.5}
  #page-home .home-dashboard-overview .metric b{font-size:19px}
  #page-home .home-side-column .home-feature-grid{grid-template-columns:minmax(0,1fr)}
 }
+
+
+/* Home dashboard inspired by the Omegaplus Pro AI home-page concept:
+   make the feature launcher a full-width dashboard section before the analyzer. */
+#page-home>.home-feature-section{
+ width:100%;max-width:none;margin:0 0 22px;padding:22px;
+ border:1px solid #293a51;border-radius:20px;
+ background:linear-gradient(155deg,#121e30,#0b1422);
+ box-shadow:0 14px 34px rgba(0,0,0,.16)
+}
+#page-home>.home-feature-section .home-section-heading{
+ display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:18px
+}
+#page-home>.home-feature-section .home-section-heading h2{
+ font-size:clamp(21px,2.2vw,28px);letter-spacing:-.7px;margin:5px 0
+}
+#page-home>.home-feature-section .home-section-heading p{max-width:620px}
+#page-home>.home-feature-section .home-feature-grid{
+ display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:11px
+}
+#page-home>.home-feature-section .home-feature{
+ min-width:0;min-height:128px;padding:15px;border-radius:15px;
+ border:1px solid #2a3e57;background:linear-gradient(145deg,#142238,#101a2a);
+ transition:transform .18s ease,border-color .18s ease,background .18s ease
+}
+#page-home>.home-feature-section .home-feature:hover{
+ transform:translateY(-2px);border-color:#54d8e8;
+ background:linear-gradient(145deg,#172b40,#111e2e)
+}
+#page-home>.home-feature-section .home-feature.feature-primary{
+ border-color:rgba(196,244,93,.52);
+ background:linear-gradient(145deg,rgba(196,244,93,.13),#101c2b 72%)
+}
+#page-home>.home-feature-section .home-feature .feature-symbol{
+ width:36px;height:36px;display:grid;place-items:center;border-radius:11px;
+ background:rgba(84,216,232,.1);color:#54d8e8;margin-bottom:12px
+}
+#page-home>.home-feature-section .home-feature.feature-primary .feature-symbol{
+ background:rgba(196,244,93,.14);color:#c4f45d
+}
+#page-home>.home-feature-section .home-feature .feature-title{font-size:13px;line-height:1.3;overflow-wrap:anywhere}
+#page-home>.home-feature-section .home-feature small{font-size:11px;line-height:1.45;margin-top:5px}
+#page-home>.home-feature-section .home-utility-row{
+ display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid #25364b
+}
+#page-home>.home-feature-section .home-utility-row>*{
+ padding:9px 12px;border:1px solid #2a3b52;border-radius:10px;background:#101b2a;color:#b9c8db;font-size:11px
+}
+#page-home .home-side-column .assistant-home-launch,#page-home .home-side-column .snap-card-v2{width:100%;max-width:none;margin:0;min-width:0}
+@media(max-width:1250px){
+ #page-home>.home-feature-section .home-feature-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:760px){
+ #page-home>.home-feature-section{padding:15px;margin-bottom:14px;border-radius:16px}
+ #page-home>.home-feature-section .home-section-heading{align-items:flex-start;margin-bottom:12px}
+ #page-home>.home-feature-section .home-feature-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ #page-home>.home-feature-section .home-feature{min-height:116px;padding:11px}
+ #page-home>.home-feature-section .home-feature .feature-title{font-size:11px}
+ #page-home>.home-feature-section .home-feature small{font-size:10px}
+ #page-home>.home-feature-section .home-utility-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ #page-home>.home-feature-section .home-utility-row>*{min-width:0;text-align:center;overflow-wrap:anywhere;padding:9px 7px}
+}
+@media(max-width:430px){
+ #page-home>.home-feature-section .home-feature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
