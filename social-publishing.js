@@ -95,5 +95,5 @@ export async function getSocialPublishingStatus(){
   const p=getPool();if(!p)return {configured:false,facebook:{configured:false},x:{configured:false},recent:[]};
   await initSocialPublishingDb();
   const recent=await p.query("SELECT platform,post_date,status,external_post_id,error_message,created_at,updated_at FROM social_post_log ORDER BY created_at DESC LIMIT 20");
-  return {configured:true,facebook:{configured:Boolean(process.env.FACEBOOK_PAGE_ID&&process.env.FACEBOOK_PAGE_ACCESS_TOKEN)},x:{configured:Boolean(process.env.X_API_KEY&&process.env.X_API_SECRET&&process.env.X_ACCESS_TOKEN&&process.env.X_ACCESS_TOKEN_SECRET)},recent:recent.rows};
+  return {configured:true,enabled:process.env.SOCIAL_PUBLISHING_ENABLED==="true",facebook:{configured:Boolean(process.env.FACEBOOK_PAGE_ID&&process.env.FACEBOOK_PAGE_ACCESS_TOKEN)},x:{configured:Boolean(process.env.X_API_KEY&&process.env.X_API_SECRET&&process.env.X_ACCESS_TOKEN&&process.env.X_ACCESS_TOKEN_SECRET)},recent:recent.rows};
 }
