@@ -12,7 +12,7 @@ import {createTicket,listUserTickets,getOrCreateChat,listChatMessages,addChatMes
 import {initOfflineSyncDb,readOfflineRecords,writeOfflineRecords} from "./offline-sync.js";
 import {initSocialPublishingDb,publishDailyBestToSocials,getSocialPublishingStatus} from "./social-publishing.js";
 import {parseBookingAssistantPrompt} from "./booking-assistant.js";
-import {chatForUser,listUserConversations,getUserConversation} from "./ai-chat.js";
+import {chatForUser,listUserConversations,getUserConversation,saveAssistantExchange} from "./ai-chat.js";
 import {smartPickRank,buildBetBuilder,performanceFromArchives,buildMatchReport,oddsMovement,extractOddsSnapshot} from "./advanced-features.js";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -1573,12 +1573,49 @@ async function verifiedAiContext(prompt){
   }
   return sections.join("\n\n").slice(0,9000);
 }
+function userCanGenerateBookingCode(user){
+  return Boolean(user && (user.role==="admin" || (["pro","premium"].includes(user.plan) && ["active","none"].includes(user.subscriptionStatus))));
+}
+function isBookingCodeIntent(message){
+  return /\b(booking\s*code|book(?:ing)?\s*(?:slip|code)|generate.{0,35}\bcode\b|create.{0,35}\bcode\b|make.{0,35}\bcode\b)\b/i.test(String(message||""));
+}
+function normalizedBookingPrompt(message){
+  let prompt=String(message||"").trim();
+  if(!/sportybet/i.test(prompt))prompt+=" for SportyBet";
+  if(!/football|soccer/i.test(prompt))prompt+=" football";
+  return prompt;
+}
 app.post("/api/assistant/chat",requireAuth,async(req,res)=>{
   try{
     const chatMessage=String(req.body?.message||"").trim();
     if(!chatMessage)return res.status(400).json({ok:false,error:"Type a message first."});
     if(chatMessage.length>2000)return res.status(400).json({ok:false,error:"Keep each message under 2,000 characters."});
     if(!allowAiChatRequest(req.user.id))return res.status(429).json({ok:false,error:"AI chat rate limit reached. Please wait a minute and try again."});
+    if(isBookingCodeIntent(chatMessage)){
+      const access=await getAccessSettings();
+      if(access.subscriptionEnabled!==false&&!userCanGenerateBookingCode(req.user)){
+        return res.status(402).json({ok:false,code:"PAID_REQUIRED",error:"An active paid plan is required to select fixtures and generate booking codes."});
+      }
+      let request;
+      try{request=parseBookingAssistantPrompt(normalizedBookingPrompt(chatMessage));}
+      catch(error){
+        const reply="I can prepare a SportyBet football booking slip. Please specify the number of games, an Over/Under goal line (0.5, 1.5, 2.5, 3.5 or 4.5), and dates. Example: Generate a booking code for 5 football games, Over 2.5 goals, today and tomorrow.";
+        const conversationId=await saveAssistantExchange({userId:req.user.id,conversationId:req.body?.conversationId,message:chatMessage,reply});
+        return res.json({ok:true,conversationId,reply,provider:"booking-assistant",bookingPreview:null});
+      }
+      const selections=await selectAssistantFixtures(request);
+      const reply=selections.length
+        ? "I found "+selections.length+" distinct available selections for "+request.marketLabel+" across "+request.dates.map(d=>d.label.toLowerCase()).join(", ")+". Review every match and its current odds below. I will request a booking code only after you press Generate booking code."
+        : "I couldn't find any active matching selections for "+request.marketLabel+" on the requested dates. I won't add filler matches. Try another date or goal line.";
+      const conversationId=await saveAssistantExchange({userId:req.user.id,conversationId:req.body?.conversationId,message:chatMessage,reply});
+      const bookingPreview=selections.length?{
+        request:{requestedGames:request.requestedGames,sport:request.sport,bookmaker:request.bookmaker,direction:request.direction,line:request.line,marketLabel:request.marketLabel,dates:request.dates.map(d=>d.date),dateLabels:request.dates.map(d=>d.label)},
+        selections,
+        warnings:selections.length<request.requestedGames?["Only "+selections.length+" distinct fixtures currently have active matching markets. No filler selections were added."]:[],
+        message:reply
+      }:null;
+      return res.json({ok:true,conversationId,reply,provider:"booking-assistant",bookingPreview});
+    }
     const context=await boundedAiContext(chatMessage);
     const result=await chatForUser({userId:req.user.id,conversationId:req.body?.conversationId,message:chatMessage,context});
     res.json({ok:true,...result});
@@ -1588,9 +1625,26 @@ app.post("/api/assistant/chat",requireAuth,async(req,res)=>{
     res.status(status).json({ok:false,error:status===400?error.message:"The AI assistant is temporarily unavailable. Your message has not produced a reply; try again shortly."});
   }
 });
+app.post("/api/assistant/booking-code",requireAuth,requirePaid,async(req,res)=>{
+  try{
+    if(!(await getAdminSettings()).bookingCodeEnabled)return res.status(503).json({ok:false,error:"Booking-code generation is temporarily disabled by the administrator."});
+    const selections=Array.isArray(req.body?.selections)?req.body.selections:[];
+    if(!selections.length)return res.status(400).json({ok:false,error:"No reviewed selections were provided."});
+    if(selections.length>50)return res.status(400).json({ok:false,error:"A booking slip can contain at most 50 selections."});
+    const result=await generateTargetBooking("sportybet",selections,"football");
+    const code=String(result.bookingCode||"");
+    const shareURL=result.shareURL?String(result.shareURL):"";
+    const reply="SportyBet returned booking code: "+code+". The app rechecked the selected markets before requesting it. Review the shared slip and current odds on SportyBet before placing any bet."+(shareURL?" Shared slip: "+shareURL:"");
+    const conversationId=await saveAssistantExchange({userId:req.user.id,conversationId:req.body?.conversationId,message:"Generate a booking code for the reviewed selections.",reply,provider:"sportybet"});
+    res.json({ok:true,conversationId,bookingCode:code,shareURL:shareURL||null,availableSelections:result.availableSelections||[],unavailableSelections:result.unavailableSelections||[],reply});
+  }catch(error){
+    const status=error.code==="NO_AVAILABLE_SELECTIONS"?409:502;
+    res.status(status).json({ok:false,error:error.message||"SportyBet could not create a booking code.",unavailableSelections:error.unavailable||[]});
+  }
+});
 app.post("/api/assistant/booking-request",requirePaid,async(req,res)=>{
   try{
-    const request=parseAssistantBookingPrompt(req.body?.prompt);
+    const request=parseBookingAssistantPrompt(req.body?.prompt);
     const selections=await selectAssistantFixtures(request);
     const warnings=[];
     if(selections.length<request.requestedGames)warnings.push("Only "+selections.length+" distinct fixtures currently have an active matching "+request.marketLabel+" market across the requested dates. No filler selections were added.");
