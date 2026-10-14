@@ -31,7 +31,7 @@ export async function initOfflineSyncDb(){
   return true;
 }
 
-function validateRecord(record){
+export function validateOfflineRecord(record){
   const key=String(record?.key||"");
   if(!/^(settings|slip:(football|basketball))$/.test(key))throw new Error("Unsupported offline record key.");
   if(!record.payload||typeof record.payload!=="object")throw new Error("Offline record payload must be an object or array.");
@@ -52,7 +52,7 @@ export async function readOfflineRecords(userId){
 
 export async function writeOfflineRecords(userId,records){
   if(!Array.isArray(records)||records.length>10)throw new Error("Send between 1 and 10 offline records.");
-  const validated=records.map(validateRecord);
+  const validated=records.map(validateOfflineRecord);
   await initOfflineSyncDb();
   const p=getPool();
   if(!p)throw new Error("Offline sync database is unavailable.");
