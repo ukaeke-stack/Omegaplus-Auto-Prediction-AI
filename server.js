@@ -1520,6 +1520,7 @@ app.post("/api/assistant/booking-request",requirePaid,async(req,res)=>{
   }catch(error){res.status(400).json({ok:false,error:error.message})}
 });
 async function runDailySocialPublishing(date){
+  if(process.env.SOCIAL_PUBLISHING_ENABLED!=="true")return {ok:true,date,status:"disabled",reason:"Social publishing is disabled. Set SOCIAL_PUBLISHING_ENABLED=true to enable it."};
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||"")))throw new Error("Invalid publishing date.");
   const archive=await readPersistentArchive(date,"football");
   let predictions=Array.isArray(archive?.dailyBestPredictions)?archive.dailyBestPredictions:[];
