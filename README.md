@@ -61,3 +61,11 @@ Publishing is text-only in this initial version. Social credentials must never b
 ## Starting point
 
 The app was imported from commit `9b88b9b2466185f987c84d9b999237dbd90d9145` of the original project. Future changes in this repository must not modify the original Omegaplus Pro AI repository or its production database.
+
+## Multi-provider AI assistant
+
+The authenticated `/api/assistant/chat` endpoint uses Groq first, Google Gemini second, and Ollama Cloud third. A provider failure, timeout, rate limit, or invalid response moves to the next configured provider. API keys stay on the server. Conversation messages are stored in the app's PostgreSQL database and are scoped to the signed-in user.
+
+Optional model overrides: `GROQ_MODEL`, `GEMINI_MODEL`, `OLLAMA_MODEL`; `AI_PROVIDER_TIMEOUT_MS` controls each provider timeout. Defaults are set in `.env.example`. If all providers fail, the API returns a service-unavailable response rather than fabricating an answer.
+
+The chat assistant does not place bets or create booking codes. Users must review real selections and use the existing explicit booking-code workflow. Betting outcomes are uncertain; no prediction is guaranteed.
