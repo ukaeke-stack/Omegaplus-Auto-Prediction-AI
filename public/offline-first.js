@@ -64,10 +64,11 @@
     try{localStorage.setItem(metaKey(key),String(Date.now()))}catch{}
     scheduleSync();
   }
+  let applyingRemote=false;
   const originalSet=Storage.prototype.setItem;
   Storage.prototype.setItem=function(key,value){
     originalSet.call(this,key,value);
-    if(this===localStorage&&LOCAL_KEYS.includes(String(key))&&!String(key).startsWith("omega_offline_meta:"))markLocalChange(recordKey(String(key)));
+    if(this===localStorage&&!applyingRemote&&LOCAL_KEYS.includes(String(key))&&!String(key).startsWith("omega_offline_meta:"))markLocalChange(recordKey(String(key)));
   };
   function recordKey(localKey){return localKey==="omegaplus_settings_v2"?"settings":localKey.replace("omegaplus_prediction_slip_v1:","slip:")}
   function localValue(localKey){
@@ -93,8 +94,11 @@
       for(const localKey of LOCAL_KEYS){
         const key=recordKey(localKey),meta=Number(localStorage.getItem(metaKey(key))||0),local=localValue(localKey),remoteRow=remote.get(key),remoteTime=remoteRow?Date.parse(remoteRow.clientUpdatedAt):0;
         if(remoteRow&&remoteTime>=meta){
-          localStorage.setItem(localKey,JSON.stringify(remoteRow.payload));
-          localStorage.setItem(metaKey(key),String(remoteTime));
+          applyingRemote=true;
+          try{
+            localStorage.setItem(localKey,JSON.stringify(remoteRow.payload));
+            localStorage.setItem(metaKey(key),String(remoteTime));
+          }finally{applyingRemote=false}
         }else if(localStorage.getItem(localKey)!==null){
           const stamp=Math.max(meta,Date.now());
           localStorage.setItem(metaKey(key),String(stamp));
