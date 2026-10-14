@@ -49,7 +49,7 @@ async function publishX(message){
   const ck=process.env.X_API_KEY||"",cs=process.env.X_API_SECRET||"",at=process.env.X_ACCESS_TOKEN||"",as=process.env.X_ACCESS_TOKEN_SECRET||"";
   if(!ck||!cs||!at||!as)return {platform:"x",status:"skipped",reason:"X write credentials are not configured."};
   const url="https://api.x.com/2/tweets";
-  const response=await fetch(url,{method:"POST",headers:{Authorization:oauthHeader("POST",url,ck,cs,at,as),"Content-Type":"application/json"},body:JSON.stringify({text:(()=>{const text=message.replace(/\\s+/g," ").trim();if(text.length<=280)return text;const cut=text.slice(0,277),lastSpace=cut.lastIndexOf(" ");return cut.slice(0,lastSpace>180?lastSpace:277)+"…"})()})});
+  const response=await fetch(url,{method:"POST",headers:{Authorization:oauthHeader("POST",url,ck,cs,at,as),"Content-Type":"application/json"},body:JSON.stringify({text:(()=>{const text=message.replace(/\s+/g," ").trim();if(text.length<=280)return text;const cut=text.slice(0,277),lastSpace=cut.lastIndexOf(" ");return cut.slice(0,lastSpace>180?lastSpace:277)+"…"})()})});
   const data=await response.json().catch(()=>({}));
   if(!response.ok||!data.data?.id)throw new Error("X publishing failed (HTTP "+response.status+"): "+String(data.detail||data.title||"No post ID returned").slice(0,220));
   return {platform:"x",status:"published",externalPostId:String(data.data.id)};
