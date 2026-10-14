@@ -1521,6 +1521,23 @@ app.get("/api/assistant/conversations/:id",requireAuth,async(req,res)=>{
     res.json({ok:true,messages});
   }catch(error){res.status(503).json({ok:false,error:"AI conversation history is temporarily unavailable."});}
 });
+const aiChatRateLimits=new Map();
+function allowAiChatRequest(userId){
+  const now=Date.now(),windowMs=60_000,limit=10;
+  const prior=aiChatRateLimits.get(String(userId))||[];
+  const recent=prior.filter(t=>now-t<windowMs);
+  if(recent.length>=limit){aiChatRateLimits.set(String(userId),recent);return false;}
+  recent.push(now);aiChatRateLimits.set(String(userId),recent);
+  if(aiChatRateLimits.size>5000){for(const [id,times] of aiChatRateLimits)if(!times.some(t=>now-t<windowMs))aiChatRateLimits.delete(id);}
+  return true;
+}
+async function boundedAiContext(prompt){
+  let timer;
+  try{return await Promise.race([
+    verifiedAiContext(prompt),
+    new Promise(resolve=>{timer=setTimeout(()=>resolve("Live app data lookup timed out. Do not claim live data was checked."),4000)})
+  ])}finally{clearTimeout(timer)}
+}
 async function verifiedAiContext(prompt){
   const q=String(prompt||"").toLowerCase();
   if(!/(fixture|fixtures|match|matches|upcoming|today|tomorrow|odds|league|market|prediction|predictions|best pick|confidence|score)/.test(q))return "";
@@ -1557,7 +1574,8 @@ async function verifiedAiContext(prompt){
 }
 app.post("/api/assistant/chat",requireAuth,async(req,res)=>{
   try{
-    const context=await verifiedAiContext(req.body?.message);
+    if(!allowAiChatRequest(req.user.id))return res.status(429).json({ok:false,error:"AI chat rate limit reached. Please wait a minute and try again."});
+    const context=await boundedAiContext(req.body?.message);
     const result=await chatForUser({userId:req.user.id,conversationId:req.body?.conversationId,message:req.body?.message,context});
     res.json({ok:true,...result});
   }catch(error){
