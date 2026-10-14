@@ -21,5 +21,7 @@ jobs:
       - run: node --check support.js
       - run: node --check offline-sync.js
       - run: node --check public/offline-first.js
+      - run: node --check social-publishing.js
+      - run: node --check public/voice-assistant.js
       - run: node --check public/sw.js
       - run: npm test
