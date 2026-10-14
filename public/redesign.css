@@ -326,3 +326,34 @@ button:disabled{opacity:.5}
 @media(max-width:430px){
  #page-home>.home-feature-section .home-feature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* Home page simplification: remove the duplicate feature directory and clarify hierarchy. */
+#page-home{max-width:1500px;padding:0 clamp(12px,2vw,26px) 34px}
+#page-home .hero-dashboard{margin-top:18px;margin-bottom:14px;min-height:218px;padding:clamp(22px,2.7vw,34px)}
+#page-home .hero-dashboard .hero-copy{max-width:760px}
+#page-home .home-sports-strip{margin-bottom:14px}
+#page-home .home-dashboard-overview{margin-bottom:18px;gap:10px}
+#page-home .home-dashboard-overview .live-card{min-height:56px}
+#page-home .home-workspace-grid{grid-template-columns:minmax(0,1.7fr) minmax(290px,.7fr);gap:16px}
+#page-home .home-primary-column,#page-home .home-side-column{gap:13px}
+#page-home .today-picks{padding:clamp(15px,1.8vw,22px)}
+#page-home .today-picks .section-head h2{margin-top:5px}
+#page-home .home-side-column .assistant-home-launch,
+#page-home .home-side-column .snap-card-v2{margin:0;width:100%;max-width:none}
+#page-home .home-side-column .assistant-home-launch{padding:17px}
+#page-home .home-side-column .snap-card-v2{padding:0;overflow:hidden}
+#page-home .home-side-column .snap-body{padding:14px}
+#page-home .home-side-column .snap-head{padding:15px 16px}
+@media(max-width:1050px){
+ #page-home .home-workspace-grid{grid-template-columns:minmax(0,1.35fr) minmax(270px,.85fr);gap:12px}
+}
+@media(max-width:760px){
+ #page-home{padding:0 12px 26px}
+ #page-home .hero-dashboard{margin:12px 0;padding:22px 18px}
+ #page-home .home-dashboard-overview{margin-bottom:13px}
+ #page-home .home-workspace-grid{grid-template-columns:minmax(0,1fr);gap:13px}
+ #page-home .home-primary-column{grid-row:1}
+ #page-home .home-side-column{grid-row:2}
+ #page-home .home-side-column .assistant-home-launch{padding:15px}
+}
