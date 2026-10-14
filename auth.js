@@ -153,9 +153,17 @@ export async function initAuthDb(){
 async function ensureBootstrapAdmin(){
   const email=cleanEmail(process.env.ADMIN_EMAIL);
   const password=String(process.env.ADMIN_PASSWORD||"");
-  if(!email||password.length<12)return;
+  if(!email)return;
   const found=await q("select id from users where email=$1",[email]);
-  if(found.rowCount)return;
+  if(found.rowCount){
+    await q("update users set role='admin',plan='premium',email_verified=true,updated_at=now() where id=$1",[found.rows[0].id]);
+    console.log("Omegaplus administrator access ensured for "+email);
+    return;
+  }
+  if(password.length<12){
+    console.warn("ADMIN_EMAIL is configured but no matching account exists; set a strong ADMIN_PASSWORD of at least 12 characters to provision it.");
+    return;
+  }
   const {hash,salt}=hashPassword(password);
   await q("insert into users(email,password_hash,password_salt,name,role,plan,email_verified) values($1,$2,$3,$4,'admin','premium',true)",[email,hash,salt,"Omegaplus Administrator"]);
   console.log("Omegaplus admin account provisioned for "+email);
