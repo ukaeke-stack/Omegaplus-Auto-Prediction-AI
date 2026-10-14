@@ -61,7 +61,7 @@
   const originalSet=Storage.prototype.setItem;
   Storage.prototype.setItem=function(key,value){
     originalSet.call(this,key,value);
-    if(this===localStorage&&LOCAL_KEYS.includes(String(key))&&!String(key).startsWith("omega_offline_meta:"))markLocalChange(String(key));
+    if(this===localStorage&&LOCAL_KEYS.includes(String(key))&&!String(key).startsWith("omega_offline_meta:"))markLocalChange(recordKey(String(key)));
   };
   function recordKey(localKey){return localKey==="omegaplus_settings_v2"?"settings":localKey.replace("omegaplus_prediction_slip_v1:","slip:")}
   function localValue(localKey){
