@@ -1558,7 +1558,7 @@ async function runDailySocialPublishing(date){
 app.post("/api/automation/social/daily-best",async(req,res)=>{
   const expected=process.env.CRON_SECRET||"",supplied=String(req.headers["x-cron-secret"]||"");
   if(!expected||!supplied||supplied.length!==expected.length||!crypto.timingSafeEqual(Buffer.from(supplied),Buffer.from(expected)))return res.status(401).json({ok:false,error:"Unauthorized automation request."});
-  try{res.json(await runDailySocialPublishing(String(req.body?.date||localDayKey(Date.now())))}catch(error){res.status(502).json({ok:false,error:String(error.message||error).slice(0,400)})}
+  try{res.json(await runDailySocialPublishing(String(req.body?.date||localDayKey(Date.now()))))}catch(error){res.status(502).json({ok:false,error:String(error.message||error).slice(0,400)})}
 });
 app.post("/api/admin/social/publish-daily-best",requireRole("admin"),async(req,res)=>{
   try{const result=await runDailySocialPublishing(String(req.body?.date||localDayKey(Date.now())));await audit(req,"admin.social.daily_best.publish",result.date,{pickCount:result.pickCount||0,outcomes:result.outcomes||[]});res.json(result)}
