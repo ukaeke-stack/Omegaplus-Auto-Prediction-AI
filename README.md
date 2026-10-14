@@ -64,7 +64,7 @@ The app was imported from commit `9b88b9b2466185f987c84d9b999237dbd90d9145` of t
 
 ## Multi-provider AI assistant
 
-The authenticated `/api/assistant/chat` endpoint uses Groq first, Google Gemini second, and Ollama Cloud third. A provider failure, timeout, rate limit, or invalid response moves to the next configured provider. API keys stay on the server. Conversation messages are stored in the app's PostgreSQL database and are scoped to the signed-in user.
+The authenticated `/api/assistant/chat` endpoint uses Groq first (`openai/gpt-oss-120b`), Google Gemini second (`gemini-3.8-flash`), and Ollama Cloud third (`gpt-oss:120b-cloud`). A provider failure, timeout, rate limit, or invalid response moves to the next configured provider. API keys stay on the server. Conversation messages are stored in the app's PostgreSQL database and are scoped to the signed-in user. Requests about fixtures and predictions receive a bounded context snapshot from the app's actual SportyBet fixture feed and existing prediction engine; when that lookup fails, the assistant is instructed not to pretend it checked live data.
 
 Optional model overrides: `GROQ_MODEL`, `GEMINI_MODEL`, `OLLAMA_MODEL`; `AI_PROVIDER_TIMEOUT_MS` controls each provider timeout. Defaults are set in `.env.example`. If all providers fail, the API returns a service-unavailable response rather than fabricating an answer.
 
