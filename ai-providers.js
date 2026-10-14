@@ -40,7 +40,7 @@ async function callGroq(messages, env, fetchImpl) {
       temperature: 0.4,
       max_tokens: 900
     }),
-    signal: timeoutSignal(Number(env.AI_PROVIDER_TIMEOUT_MS) || 18000)
+    signal: timeoutSignal(Number(env.AI_PROVIDER_TIMEOUT_MS) || 7000)
   });
   const data = await readJson(response);
   const content = data?.choices?.[0]?.message?.content;
