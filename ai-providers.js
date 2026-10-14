@@ -58,10 +58,10 @@ async function callGemini(messages, env, fetchImpl) {
     parts: [{ text: m.content }]
   }));
   const url = (env.GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta")
-    + "/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key);
+    + "/models/" + encodeURIComponent(model) + ":generateContent";
   const response = await fetchImpl(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
       ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
       contents,
@@ -112,7 +112,7 @@ export async function generateWithFallback({ messages, env = process.env, fetchI
     }
     try {
       const reply = await CALLERS[provider](safeMessages, env, fetchImpl);
-      return { reply, provider, fallbackUsed: errors.some(e => e.error !== "not configured"), attempted: [...errors.map(e => e.provider), provider] };
+      return { reply, provider, fallbackUsed: errors.length > 0, attempted: [...errors.map(e => e.provider), provider] };
     } catch (error) {
       errors.push({ provider, error: String(error?.message || "provider failed").slice(0, 240) });
     }
