@@ -10,7 +10,7 @@ function drawSlipImage(code){
  ctx.fillStyle="#07120e";ctx.fillRect(0,0,w,canvas.height);
  ctx.fillStyle="#18e76b";ctx.fillRect(0,0,w,12);
  ctx.fillStyle="#eef5f0";ctx.font="bold 42px system-ui";ctx.fillText("OMEGAPLUS AUTO PREDICTION AI",48,76);
- ctx.fillStyle="#93a79a";ctx.font="24px system-ui";ctx.fillText("SPORTYBET · FOOTBALL · OVER 2.5 GOALS",48,122);
+ ctx.fillStyle="#93a79a";ctx.font="24px system-ui";ctx.fillText("SPORTYBET · "+String(lastRequest?.marketLabel||"FOOTBALL SELECTIONS").toUpperCase(),48,122);
  ctx.fillStyle="#18e76b";ctx.font="bold 28px system-ui";ctx.fillText(lastSelections.length+" selections",48,174);
  let y=head;
  lastSelections.forEach((s,i)=>{ctx.fillStyle=i%2?"#0e1b14":"#0b1510";ctx.fillRect(32,y-34,w-64,lineH);ctx.fillStyle="#eef5f0";ctx.font="bold 22px system-ui";ctx.fillText((i+1)+". "+String(s.home+" vs "+s.away).slice(0,60),50,y);ctx.fillStyle="#18e76b";ctx.font="20px system-ui";ctx.fillText("Over 2.5 goals",w-260,y);y+=lineH});
