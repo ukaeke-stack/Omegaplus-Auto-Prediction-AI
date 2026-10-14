@@ -1503,7 +1503,10 @@ async function selectAssistantFixtures(request){
     }
   }
   const unique=new Map();
-  for(const row of all){const key=row.eventId+"|"+row.date+"|"+row.marketId+"|"+String(row.specifier||"")+"|"+row.outcomeId;if(!unique.has(key))unique.set(key,row)}
+  for(const row of all){
+    const key=row.eventId+"|"+row.date,previous=unique.get(key);
+    if(!previous||row.confidence>previous.confidence)unique.set(key,row);
+  }
   return [...unique.values()].sort((a,b)=>b.confidence-a.confidence||a.startTimeMs-b.startTimeMs).slice(0,request.requestedGames);
 }
 app.post("/api/assistant/booking-request",requirePaid,async(req,res)=>{
