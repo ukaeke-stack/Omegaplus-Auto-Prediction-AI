@@ -1,9 +1,9 @@
 const PROVIDER_ORDER = ["groq", "gemini", "ollama"];
 
 const DEFAULT_MODELS = {
-  groq: "llama-3.3-70b-versatile",
-  gemini: "gemini-2.5-flash",
-  ollama: "gpt-oss:120b"
+  groq: "openai/gpt-oss-120b",
+  gemini: "gemini-3.8-flash",
+  ollama: "gpt-oss:120b-cloud"
 };
 
 function timeoutSignal(ms) {
