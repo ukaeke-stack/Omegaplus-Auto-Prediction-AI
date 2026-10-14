@@ -25,6 +25,8 @@ This does not connect to or migrate any data from Omegaplus Pro AI. The local In
 2. Use Node as the runtime, `npm install` as the build command, and `npm start` as the start command.
 3. Set the health-check path to `/health`.
 4. Create a dedicated PostgreSQL database for this app and set `DATABASE_URL` to that database's internal connection string. Never use the original Omegaplus Pro AI database URL.
+
+   **Temporary database warning:** the current Render Free database `omegaplus-auto-prediction-ai-db` is scheduled to expire on **13 November 2026**. Upgrade it or migrate its data to a durable database before expiry; the phone's local cache is not a replacement for a permanent server-side backup.
 5. Configure the environment variables required by the app. Use a unique, strong admin password, and set `CRON_SECRET` and `APP_BASE_URL` before enabling scheduled jobs.
 6. Keep API keys in Render's environment settings only. Do not commit real credentials or copy production secrets from the original app.
 
