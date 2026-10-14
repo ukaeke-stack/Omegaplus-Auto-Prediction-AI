@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [feature/offline-first-database]
+    branches: [main, feature/offline-first-database]
   workflow_dispatch:
 
 jobs:
