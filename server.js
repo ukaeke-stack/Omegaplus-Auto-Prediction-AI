@@ -19,9 +19,9 @@ async function enrichAndModel(rows,opts){return applyDerivedModel(await enrichPr
 const app=express();
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=process.env.PORT||3000;
-const APP_VERSION="1.6.0";
-const APP_ID="com.omegaplus.proai";
-const APP_VERSION_CODE=5;
+const APP_VERSION="0.1.0";
+const APP_ID="com.omegaplus.autopredictionai";
+const APP_VERSION_CODE=1;
 const ANDROID_TARGET_SDK=36;
 const MIN_SUPPORTED_WEB_VERSION="1.6.0";
 const DAILY_PREDICTION_MIN_ODDS=1.10;
@@ -617,8 +617,8 @@ app.get("/api/admin/release-check",requireRole("admin"),async(req,r)=>{
   }catch(e){r.status(503).json({ok:false,releaseReady:false,error:e.message})}
 });
 app.get("/api/sports",(_,r)=>r.json({ok:true,sports:SPORTS}));
-app.get("/health",(_,r)=>r.status(200).json({status:"healthy",service:"omegaplus-pro-ai",version:APP_VERSION,uptime:Math.round(process.uptime())}));
-app.get("/api/health",async(_,r)=>{const stats=await independentHealth();r.json({ok:true,service:"Omegaplus Pro AI",version:APP_VERSION,branch:"main",liveSportyBet:true,accountSystem:{configured:authDbConfigured(),ready:await dbReady()},independentStats:stats,multiBookmaker:BOOKMAKERS.map(x=>({id:x.id,name:x.name,codeGeneration:x.id==="sportybet"||Boolean(BETRELAY_API_KEY)}))})});
+app.get("/health",(_,r)=>r.status(200).json({status:"healthy",service:"omegaplus-auto-prediction-ai",version:APP_VERSION,uptime:Math.round(process.uptime())}));
+app.get("/api/health",async(_,r)=>{const stats=await independentHealth();r.json({ok:true,service:"Omegaplus Auto Prediction AI",version:APP_VERSION,branch:"main",liveSportyBet:true,accountSystem:{configured:authDbConfigured(),ready:await dbReady()},independentStats:stats,multiBookmaker:BOOKMAKERS.map(x=>({id:x.id,name:x.name,codeGeneration:x.id==="sportybet"||Boolean(BETRELAY_API_KEY)}))})});
 app.get("/api/auth/me",async(req,r)=>{try{const user=await currentUser(req);r.json({ok:Boolean(user),user:user||null})}catch{r.json({ok:false,user:null})}});
 app.post("/api/auth/register",async(req,r)=>{try{if(!(await getAdminSettings()).registrationEnabled)return r.status(403).json({ok:false,error:"New registration is currently disabled by the administrator."});const user=await registerUser(req.body||{},req);const session=await (await import("./auth.js")).createSession(user,req);setSessionCookie(r,session.token);r.status(201).json({ok:true,user})}catch(e){r.status(400).json({ok:false,error:e.message})}});
 app.post("/api/auth/login",async(req,r)=>{try{const x=await loginUser(req.body||{},req);setSessionCookie(r,x.session.token);r.json({ok:true,user:x.user})}catch(e){r.status(401).json({ok:false,error:e.message})}});
@@ -1542,5 +1542,5 @@ app.get("/{*splat}",(_,r)=>r.sendFile(path.join(__dirname,"public","index.html")
 
 // Vercel invokes the Express app as a serverless function. Keep the local
 // listener for `npm start`, but do not open a second listener inside Vercel.
-if (!process.env.VERCEL) app.listen(PORT,()=>console.log("Omegaplus Pro AI listening on "+PORT));
+if (!process.env.VERCEL) app.listen(PORT,()=>console.log("Omegaplus Auto Prediction AI listening on "+PORT));
 export default app;
