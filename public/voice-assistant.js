@@ -47,12 +47,12 @@ async function generateCode(){
  }catch(e){status.textContent=e.message; if(/paid|subscription|plan/i.test(e.message))status.textContent=e.message+" You can review the selected games, but code generation follows your account's booking-code access.";say(e.message)}
  finally{btn.disabled=false}
 }
-function voice(){
+function voice(promptSelector="#assistantPrompt",buttonSelector="#assistantMic"){
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){setStatus("Voice input is not supported by this browser. You can type the request instead.");return}
  const rec=new SR();rec.lang="en-NG";rec.interimResults=false;rec.maxAlternatives=1;
- const b=$("#assistantMic");b.disabled=true;b.textContent="Listening…";
- rec.onresult=e=>{$("#assistantPrompt").value=e.results[0][0].transcript;setStatus("Voice request captured. Review the text, then submit.");};
+ const b=$(buttonSelector);if(!b)return;b.disabled=true;b.textContent="Listening…";
+ rec.onresult=e=>{const input=$(promptSelector);if(input)input.value=e.results[0][0].transcript;setStatus("Voice request captured. Review the text, then submit.");};
  rec.onerror=e=>setStatus(e.error==="not-allowed"?"Microphone permission was denied. Allow microphone access or type your request.":"Voice input failed. You can type the request instead.");
  rec.onend=()=>{b.disabled=false;b.textContent="🎙 Speak";};
  rec.start();
@@ -63,7 +63,10 @@ function init(){
  document.querySelectorAll('[data-page="voice-assistant"]').forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".page").forEach(p=>p.classList.remove("active-page"));$("#page-voice-assistant")?.classList.add("active-page");document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page==="voice-assistant"));$("#side")?.classList.remove("open");$("#backdrop")?.classList.remove("show")}));
  $("#assistantSubmit")?.addEventListener("click",submitPrompt);
  $("#assistantPrompt")?.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();submitPrompt()}});
- $("#assistantMic")?.addEventListener("click",voice);
+ $("#assistantMic")?.addEventListener("click",()=>voice("#assistantPrompt","#assistantMic"));
+ $("#assistantMicHome")?.addEventListener("click",()=>voice("#assistantPromptHome","#assistantMicHome"));
+ $("#assistantLaunch")?.addEventListener("click",()=>{const home=$("#assistantPromptHome"),input=$("#assistantPrompt");if(input&&home)input.value=home.value;document.querySelectorAll(".page").forEach(p=>p.classList.remove("active-page"));$("#page-voice-assistant")?.classList.add("active-page");document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page==="voice-assistant"));$("#assistantSubmit")?.click()});
+ $("#assistantPromptHome")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("#assistantLaunch")?.click()}});
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
 })();
