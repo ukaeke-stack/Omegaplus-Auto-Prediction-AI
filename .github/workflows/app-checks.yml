@@ -17,6 +17,7 @@ jobs:
           node-version: 20
       - run: npm install
       - run: node --check server.js
+      - run: node --check booking-assistant.js
       - run: node --check auth.js
       - run: node --check support.js
       - run: node --check offline-sync.js
