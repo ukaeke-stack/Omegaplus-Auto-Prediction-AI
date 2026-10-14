@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, feature/offline-first-database, feature/social-automation-voice-assistant]
+    branches: [main, feature/offline-first-database, feature/social-automation-voice-assistant, feature/multi-provider-ai-assistant]
   workflow_dispatch:
 
 jobs:
