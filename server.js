@@ -1516,9 +1516,9 @@ async function selectAssistantFixtures(request){
           const outcomeName=String(outcome.outcomeName||"");
           if(!new RegExp("\\b"+request.direction+"\\b","i").test(outcomeName))continue;
           const specifierText=String(market.specifier||"");
-          const explicitLine=specifierText.match(/(?:total|goals?|line)\\s*[=:]\\s*(\\d+(?:\\.\\d+)?)/i);
-          const outcomeLine=outcomeName.match(/\\b(?:over|under)\\s*(\\d+(?:\\.\\d+)?)/i);
-          const anyLine=specifierText.match(/\\d+(?:\\.\\d+)?/);
+          const explicitLine=specifierText.match(/(?:total|goals?|line)\s*[=:]\s*(\d+(?:\.\d+)?)/i);
+          const outcomeLine=outcomeName.match(/\b(?:over|under)\s*(\d+(?:\.\d+)?)/i);
+          const anyLine=specifierText.match(/\d+(?:\.\d+)?/);
           const actualLine=Number(explicitLine?.[1]||outcomeLine?.[1]||anyLine?.[0]||NaN);
           if(!Number.isFinite(actualLine)||Math.abs(actualLine-request.line)>0.001)continue;
           all.push({eventId:String(fixture.eventId),home:String(fixture.home),away:String(fixture.away),league:String(fixture.league||""),date:day.date,startTimeMs:Number(fixture.startTimeMs||0),pick:(request.direction==="over"?"Over ":"Under ")+request.line,marketId:String(market.marketId),specifier:market.specifier??null,outcomeId:String(outcome.outcomeId),odds:Number(outcome.odds),confidence:confidenceForOutcome(market,outcome),sport:"football"});
