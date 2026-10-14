@@ -28,8 +28,14 @@
     try{
       const u=new URL(url,location.href);
       if(u.origin!==location.origin||!u.pathname.startsWith("/api/"))return false;
-      if(/^\/api\/(auth|admin|support|payments?|subscription|account|offline-sync)(\/|$)/i.test(u.pathname))return false;
-      return true;
+      const publicReadPaths=[
+        "/api/health","/api/sports","/api/markets","/api/bookmakers","/api/scan",
+        "/api/history","/api/results","/api/results/status","/api/results/leagues","/api/results/live",
+        "/api/leagues","/api/predictions","/api/best-picks","/api/daily-best","/api/performance",
+        "/api/stats/status","/api/intelligence-status","/api/smart-picks","/api/performance-advanced","/api/odds-movement"
+      ];
+      if(/^\/api\/(auth|admin|support|payments?|subscription|account|offline-sync|correct-scores)(\/|$)/i.test(u.pathname))return false;
+      return publicReadPaths.includes(u.pathname);
     }catch{return false}
   }
   const nativeFetch=window.fetch.bind(window);
@@ -86,7 +92,7 @@
       const pending=[];
       for(const localKey of LOCAL_KEYS){
         const key=recordKey(localKey),meta=Number(localStorage.getItem(metaKey(key))||0),local=localValue(localKey),remoteRow=remote.get(key),remoteTime=remoteRow?Date.parse(remoteRow.clientUpdatedAt):0;
-        if(remoteRow&&remoteTime>meta){
+        if(remoteRow&&remoteTime>=meta){
           localStorage.setItem(localKey,JSON.stringify(remoteRow.payload));
           localStorage.setItem(metaKey(key),String(remoteTime));
         }else if(localStorage.getItem(localKey)!==null){
