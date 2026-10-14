@@ -1542,7 +1542,7 @@ async function verifiedAiContext(prompt){
   const q=String(prompt||"").toLowerCase();
   if(!/(fixture|fixtures|match|matches|upcoming|today|tomorrow|odds|league|market|prediction|predictions|best pick|confidence|score)/.test(q))return "";
   const sections=[];
-  const sport=/\\b(basketball|nba|wnba)\\b/.test(q)?"basketball":/table tennis|ping pong/.test(q)?"table_tennis":/\\btennis\\b/.test(q)?"tennis":/ice hockey|\\bhockey\\b|\\bnhl\\b/.test(q)?"ice_hockey":/\\b(baseball|mlb)\\b/.test(q)?"baseball":"football";
+  const sport=/\b(basketball|nba|wnba)\b/.test(q)?"basketball":/table tennis|ping pong/.test(q)?"table_tennis":/\btennis\b/.test(q)?"tennis":/ice hockey|\bhockey\b|\bnhl\b/.test(q)?"ice_hockey":/\b(baseball|mlb)\b/.test(q)?"baseball":"football";
   try{
     const base=localDayKey(Date.now());
     const dates=[];
