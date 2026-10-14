@@ -51,6 +51,7 @@ Configure these Render environment variables only on the Auto Prediction AI serv
 - `FACEBOOK_PAGE_ID` and `FACEBOOK_PAGE_ACCESS_TOKEN` — a Page token with the required publishing permissions.
 - `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, and `X_ACCESS_TOKEN_SECRET` — X OAuth 1.0a user-context credentials with write permission.
 - `CRON_SECRET` — a long, unique random secret protecting the automation endpoint.
+- `SOCIAL_PUBLISHING_ENABLED` — keep `false` until you are ready to publish; set to `true` to enable scheduled and manual posting.
 - `APP_BASE_URL` — the public URL of the Auto Prediction AI service.
 
 Also add `APP_BASE_URL` and `CRON_SECRET` as GitHub Actions repository secrets. The workflow in `.github/workflows/social-publishing.yml` triggers the protected endpoint daily at 09:00 UTC (10:00 in Nigeria). GitHub Actions schedules can be delayed, so this is a daily automation rather than an exact-time guarantee. An administrator can trigger a post manually via the authenticated admin endpoint, and inspect configuration/recent outcomes through the admin status endpoint.
