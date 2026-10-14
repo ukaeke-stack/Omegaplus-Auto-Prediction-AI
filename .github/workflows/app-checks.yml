@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, feature/offline-first-database]
+    branches: [main, feature/offline-first-database, feature/social-automation-voice-assistant]
   workflow_dispatch:
 
 jobs:
@@ -17,9 +17,12 @@ jobs:
           node-version: 20
       - run: npm install
       - run: node --check server.js
+      - run: node --check booking-assistant.js
       - run: node --check auth.js
       - run: node --check support.js
       - run: node --check offline-sync.js
       - run: node --check public/offline-first.js
+      - run: node --check social-publishing.js
+      - run: node --check public/voice-assistant.js
       - run: node --check public/sw.js
       - run: npm test

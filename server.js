@@ -10,6 +10,8 @@ import {rankByReliability} from "./analyzer-reliability.js";
 import {analyzeCorrectScores} from "./correct-score.js";
 import {createTicket,listUserTickets,getOrCreateChat,listChatMessages,addChatMessage,adminTickets,updateTicket,adminThreads,adminMessages,adminAddMessage,setThreadStatus,initSupportDb} from "./support.js";
 import {initOfflineSyncDb,readOfflineRecords,writeOfflineRecords} from "./offline-sync.js";
+import {initSocialPublishingDb,publishDailyBestToSocials,getSocialPublishingStatus} from "./social-publishing.js";
+import {parseBookingAssistantPrompt} from "./booking-assistant.js";
 import {smartPickRank,buildBetBuilder,performanceFromArchives,buildMatchReport,oddsMovement,extractOddsSnapshot} from "./advanced-features.js";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -38,7 +40,13 @@ const BETRELAY_API_KEY=process.env.BETRELAY_API_KEY||"";
 async function betRelayFetch(pathname,options={}){if(!BETRELAY_API_KEY)throw new Error("Multi-bookmaker code service is not configured yet. Add BETRELAY_API_KEY to Railway.");const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);try{const res=await fetch(BETRELAY_BASE+pathname,{...options,headers:{Accept:"application/json","Content-Type":"application/json","X-API-Key":BETRELAY_API_KEY,...(options.headers||{})},signal:controller.signal});const text=await res.text();let body=null;try{body=text?JSON.parse(text):null}catch{}if(!res.ok)throw new Error(body?.message||("BetRelay HTTP "+res.status));if(!body)throw new Error("BetRelay returned an invalid response");return body}finally{clearTimeout(timer)}}
 function bookmakerById(id){return BOOKMAKERS.find(x=>x.id===String(id))}
 async function createSportyBooking(selections,sport="football"){
-  const fixtures=await getSportyFixtures(false,true,sport);
+  const requestedDates=[...new Set(selections.map(s=>String(s.date||"")).filter(d=>/^\\d{4}-\\d{2}-\\d{2}$/.test(d)))];
+  let fixtures=[];
+  if(requestedDates.length){
+    for(const date of requestedDates){const day=await getDayFixtures(date,true,sport);fixtures.push(...(day.fixtures||[]));}
+  }else{
+    fixtures=await getSportyFixtures(false,true,sport);
+  }
   const available=[],unavailable=[];
   for(const s of selections){
     const f=fixtures.find(x=>x.eventId===s.eventId);
@@ -63,7 +71,7 @@ async function generateTargetBooking(target,selections,sport="football"){const t
 
 
 app.use(express.json({limit:"1mb",verify:(req,res,buf)=>{req.rawBody=Buffer.from(buf)}}));
-initAuthDb().then(ok=>{console.log("Account database:",ok?"ready":"not configured/unavailable");return initSupportDb()}).then(ok=>{console.log("Support database:",ok?"ready":"not configured/unavailable");return initOfflineSyncDb()}).then(ok=>console.log("Offline sync database:",ok?"ready":"not configured/unavailable")).catch(err=>console.error("Database initialization failed:",err.message));
+initAuthDb().then(ok=>{console.log("Account database:",ok?"ready":"not configured/unavailable");return initSupportDb()}).then(ok=>{console.log("Support database:",ok?"ready":"not configured/unavailable");return initOfflineSyncDb()}).then(ok=>{console.log("Offline sync database:",ok?"ready":"not configured/unavailable");return initSocialPublishingDb()}).then(ok=>console.log("Social publishing database:",ok?"ready":"not configured/unavailable")).catch(err=>console.error("Database initialization failed:",err.message));
 app.use((req,res,next)=>{
   if(req.path==="/"||/\.(?:js|css|html|webmanifest)$/.test(req.path)) res.setHeader("Cache-Control","no-store, no-cache, must-revalidate, proxy-revalidate");
   next();
@@ -1468,6 +1476,78 @@ app.post("/api/snap-predict/better-options",requirePaid,async(req,r)=>{
     }
     r.json({ok:true,total:matches.length,matches,source:"Current SportyBet markets",note:"Alternatives are ranked by normalized market-implied probability and current odds. They are not guarantees of winning."});
   }catch(e){r.status(502).json({ok:false,error:e.message||"Could not find alternatives right now."})}
+});
+
+async function selectAssistantFixtures(request){
+  const all=[];
+  for(const day of request.dates){
+    const result=await getDayFixtures(day.date,false,"football");
+    for(const fixture of result.fixtures||[]){
+      if(!fixture.eventId||!fixture.home||!fixture.away)continue;
+      for(const market of fixture.markets||[]){
+        const name=String(market.marketName||"").toLowerCase();
+        if(!marketMatchesType(market,"ou")||/corner|card|booking|team total|first half|1st half|half time/.test(name))continue;
+        for(const outcome of market.outcomes||[]){
+          if(outcome.isActive===false||!Number.isFinite(Number(outcome.odds))||Number(outcome.odds)<=1)continue;
+          const outcomeName=String(outcome.outcomeName||"");
+          if(!new RegExp("\\b"+request.direction+"\\b","i").test(outcomeName))continue;
+          const specifierText=String(market.specifier||"");
+          const explicitLine=specifierText.match(/(?:total|goals?|line)\s*[=:]\s*(\d+(?:\.\d+)?)/i);
+          const outcomeLine=outcomeName.match(/\b(?:over|under)\s*(\d+(?:\.\d+)?)/i);
+          const anyLine=specifierText.match(/\d+(?:\.\d+)?/);
+          const actualLine=Number(explicitLine?.[1]||outcomeLine?.[1]||anyLine?.[0]||NaN);
+          if(!Number.isFinite(actualLine)||Math.abs(actualLine-request.line)>0.001)continue;
+          all.push({eventId:String(fixture.eventId),home:String(fixture.home),away:String(fixture.away),league:String(fixture.league||""),date:day.date,startTimeMs:Number(fixture.startTimeMs||0),pick:(request.direction==="over"?"Over ":"Under ")+request.line,marketId:String(market.marketId),specifier:market.specifier??null,outcomeId:String(outcome.outcomeId),odds:Number(outcome.odds),confidence:confidenceForOutcome(market,outcome),sport:"football"});
+        }
+      }
+    }
+  }
+  const unique=new Map();
+  for(const row of all){
+    const key=row.eventId+"|"+row.date,previous=unique.get(key);
+    if(!previous||row.confidence>previous.confidence)unique.set(key,row);
+  }
+  return [...unique.values()].sort((a,b)=>b.confidence-a.confidence||a.startTimeMs-b.startTimeMs).slice(0,request.requestedGames);
+}
+app.post("/api/assistant/booking-request",requirePaid,async(req,res)=>{
+  try{
+    const request=parseAssistantBookingPrompt(req.body?.prompt);
+    const selections=await selectAssistantFixtures(request);
+    const warnings=[];
+    if(selections.length<request.requestedGames)warnings.push("Only "+selections.length+" distinct fixtures currently have an active matching "+request.marketLabel+" market across the requested dates. No filler selections were added.");
+    if(selections.length)warnings.push("Selections are ranked by the available bookmaker market probability signal, not a guarantee of outcomes. Review every fixture and current odds before requesting a code.");
+    res.json({ok:true,request:{requestedGames:request.requestedGames,sport:request.sport,bookmaker:request.bookmaker,direction:request.direction,line:request.line,marketLabel:request.marketLabel,dates:request.dates.map(x=>x.date),dateLabels:request.dates.map(x=>x.label)},selections,warnings,message:selections.length?"Review the selected fixtures, then generate a booking code if the bookmaker still accepts them.":"No active fixtures matched this request. Try another date or goal line."});
+  }catch(error){res.status(400).json({ok:false,error:error.message})}
+});
+async function runDailySocialPublishing(date){
+  if(process.env.SOCIAL_PUBLISHING_ENABLED!=="true")return {ok:true,date,status:"disabled",reason:"Social publishing is disabled. Set SOCIAL_PUBLISHING_ENABLED=true to enable it."};
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||"")))throw new Error("Invalid publishing date.");
+  const archive=await readPersistentArchive(date,"football");
+  let predictions=Array.isArray(archive?.dailyBestPredictions)?archive.dailyBestPredictions:[];
+  let combinedOdds=Number(archive?.dailyCombinedOdds)||0;
+  if(!predictions.length){
+    const built=await buildDailyBest(date,"football");
+    predictions=Array.isArray(built.predictions)?built.predictions:[];
+    combinedOdds=Number(built.combinedOdds)||0;
+  }
+  predictions=predictions.filter(p=>p&&p.home&&p.away&&p.pick&&Number(p.odds)>1);
+  if(!predictions.length)return {ok:true,date,status:"skipped",reason:"No quality-qualified Daily Best selections are available; nothing was published."};
+  const lines=predictions.slice(0,10).map((p,i)=>(i+1)+". "+p.home+" vs "+p.away+" — "+p.pick+" @ "+Number(p.odds).toFixed(2));
+  const message="Omegaplus Auto Prediction AI · Daily Best\n"+date+"\n\n"+lines.join("\n")+"\n\nSelections are statistical insights, not guarantees. Check current odds and match status before betting. 18+ only. #FootballPredictions #SportsAnalytics";
+  const result=await publishDailyBestToSocials(date,message);
+  return {ok:true,date,pickCount:predictions.length,combinedOdds,outcomes:result.outcomes};
+}
+app.post("/api/automation/social/daily-best",async(req,res)=>{
+  const expected=process.env.CRON_SECRET||"",supplied=String(req.headers["x-cron-secret"]||"");
+  if(!expected||!supplied||supplied.length!==expected.length||!crypto.timingSafeEqual(Buffer.from(supplied),Buffer.from(expected)))return res.status(401).json({ok:false,error:"Unauthorized automation request."});
+  try{res.json(await runDailySocialPublishing(String(req.body?.date||localDayKey(Date.now()))))}catch(error){res.status(502).json({ok:false,error:String(error.message||error).slice(0,400)})}
+});
+app.post("/api/admin/social/publish-daily-best",requireRole("admin"),async(req,res)=>{
+  try{const result=await runDailySocialPublishing(String(req.body?.date||localDayKey(Date.now())));await audit(req,"admin.social.daily_best.publish",result.date,{pickCount:result.pickCount||0,outcomes:result.outcomes||[]});res.json(result)}
+  catch(error){res.status(502).json({ok:false,error:String(error.message||error).slice(0,400)})}
+});
+app.get("/api/admin/social/status",requireRole("admin"),async(_,res)=>{
+  try{res.json({ok:true,status:await getSocialPublishingStatus()})}catch(error){res.status(503).json({ok:false,error:"Social publishing status is unavailable."})}
 });
 
 app.post("/api/booking-code",requirePaid,async(req,r)=>{if(!(await getAdminSettings()).bookingCodeEnabled)return r.status(503).json({ok:false,error:"Booking-code generation is temporarily disabled by the administrator."});try{const selections=Array.isArray(req.body?.selections)?req.body.selections:[],sport=String(req.body?.sport||"football"),target=String(req.body?.bookmaker||"sportybet");if(!selections.length)return r.status(400).json({ok:false,error:"Select at least one analyzed match first."});r.json({ok:true,...await generateTargetBooking(target,selections,sport)})}catch(e){r.status(e.code==="NO_AVAILABLE_SELECTIONS"?409:502).json({ok:false,error:e.message,unavailableSelections:e.unavailable||[]})}});

@@ -201,3 +201,31 @@ html,body{background:radial-gradient(ellipse at 80% 0%,#102b39 0%,#071019 42%,#0
 /* Retain original analyzed selections independently from suggested alternatives. */
 .snap-retain-option{display:flex;align-items:center;justify-content:center;width:100%;min-height:36px;margin-top:10px;padding:8px 12px;border:1px solid #315342;border-radius:9px;background:#10271a;color:#8af0b7;font-size:12px;font-weight:800;cursor:pointer}
 .snap-retain-option.selected{background:#18e76b;border-color:#18e76b;color:#04150b}
+
+
+/* Voice and text booking assistant */
+.assistant-home-launch,.assistant-panel{width:min(94%,950px);margin:18px auto 24px;padding:20px;border:1px solid #1b4932;border-radius:20px;background:linear-gradient(145deg,#0c1c13,#08110c);box-shadow:0 10px 35px #0003}
+.assistant-launch-heading{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.assistant-launch-heading>span{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:#063a20;color:var(--green);font-size:26px}
+.assistant-launch-heading strong,.assistant-launch-heading small{display:block}
+.assistant-launch-heading strong{font-size:18px}
+.assistant-launch-heading small,.assistant-home-launch>small{color:var(--muted);font-size:12px;line-height:1.6}
+.assistant-home-controls{display:grid;grid-template-columns:minmax(0,1fr) 48px auto;gap:8px;margin:12px 0}
+.assistant-home-controls input,.assistant-panel textarea{min-width:0;width:100%;padding:13px;border:1px solid #244334;border-radius:12px;background:#07110b;color:var(--text);font:inherit}
+.assistant-home-controls button{margin:0}
+.assistant-panel>label{display:block;font-weight:800;margin-bottom:8px}
+.assistant-input-actions{display:flex;gap:10px;margin:10px 0}
+.assistant-input-actions>*{flex:1}
+.assistant-result-summary{display:grid;gap:5px;margin:16px 0;padding:15px;border:1px solid #21563a;border-radius:13px;background:#0a2014}
+.assistant-result-summary b{font-size:17px}
+.assistant-result-summary small{color:#9fb2a5}
+.assistant-fixture{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;align-items:start;padding:12px 4px;border-bottom:1px solid var(--line)}
+.assistant-fixture>span{color:var(--green);font-weight:900}
+.assistant-fixture b,.assistant-fixture small{display:block;overflow-wrap:anywhere}
+.assistant-fixture small{color:var(--muted);font-size:12px;margin-top:4px;line-height:1.5}
+.assistant-code{display:grid;gap:12px;margin-top:12px;padding:18px;border:1px solid #1c6941;border-radius:14px;background:#092317}
+.assistant-code small{color:#9fb2a5;letter-spacing:1.5px}
+.assistant-code strong{font-size:30px;letter-spacing:1px;overflow-wrap:anywhere;color:var(--green)}
+.assistant-code button{width:max-content}
+#assistantResults .control-actions{margin:12px 0}
+@media(max-width:540px){.assistant-home-launch,.assistant-panel{padding:14px}.assistant-home-controls{grid-template-columns:minmax(0,1fr) 44px}.assistant-home-controls #assistantLaunch{grid-column:1/-1;width:100%}.assistant-code strong{font-size:24px}}

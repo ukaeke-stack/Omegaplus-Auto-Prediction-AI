@@ -1,0 +1,28 @@
+name: Publish Daily Best to social media
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger protected app publishing endpoint
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${APP_BASE_URL}" || -z "${CRON_SECRET}" ]]; then
+            echo "Configure APP_BASE_URL and CRON_SECRET in repository Actions secrets before enabling scheduled publishing."
+            exit 1
+          fi
+          base="${APP_BASE_URL%/}"
+          curl --fail-with-body --silent --show-error \
+            --request POST "${base}/api/automation/social/daily-best" \
+            --header "Content-Type: application/json" \
+            --header "x-cron-secret: ${CRON_SECRET}" \
+            --data '{}'
