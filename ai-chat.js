@@ -84,7 +84,7 @@ export async function chatForUser({ userId, conversationId, message, context = "
   );
   await db.query("INSERT INTO public.ai_messages(conversation_id,role,content) VALUES($1,'user',$2)", [id, content]);
   const messages = [
-    { role: "system", content: SYSTEM_PROMPT + (context ? "\\n\\nVerified live app data for this request (use only these facts; do not infer missing values):\\n" + String(context).slice(0, 9000) : "") },
+    { role: "system", content: SYSTEM_PROMPT + (context ? "\n\nVerified live app data for this request (use only these facts; do not infer missing values):\n" + String(context).slice(0, 9000) : "") },
     ...previous.rows.reverse().map(row => ({ role: row.role, content: row.content })),
     { role: "user", content }
   ];
