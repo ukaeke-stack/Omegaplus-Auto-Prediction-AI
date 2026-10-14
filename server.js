@@ -1542,6 +1542,7 @@ async function verifiedAiContext(prompt){
   const q=String(prompt||"").toLowerCase();
   if(!/(fixture|fixtures|match|matches|upcoming|today|tomorrow|odds|league|market|prediction|predictions|best pick|confidence|score)/.test(q))return "";
   const sections=[];
+  const sport=/\\b(basketball|nba|wnba)\\b/.test(q)?"basketball":/table tennis|ping pong/.test(q)?"table_tennis":/\\btennis\\b/.test(q)?"tennis":/ice hockey|\\bhockey\\b|\\bnhl\\b/.test(q)?"ice_hockey":/\\b(baseball|mlb)\\b/.test(q)?"baseball":"football";
   try{
     const base=localDayKey(Date.now());
     const dates=[];
@@ -1550,7 +1551,7 @@ async function verifiedAiContext(prompt){
     else dates.push(base);
     if(/\btoday\b/.test(q)&&/\btomorrow\b/.test(q))dates.push(shift(base,1));
     for(const date of [...new Set(dates)].slice(0,2)){
-      const result=await getDayFixtures(date,false,"football");
+      const result=await getDayFixtures(date,false,sport);
       const rows=(result.fixtures||[]).filter(f=>f.home&&f.away).slice(0,10).map(f=>{
         const markets=(f.markets||[]).slice(0,5).map(m=>{
           const outcomes=(m.outcomes||[]).filter(o=>o.isActive!==false&&Number.isFinite(Number(o.odds))&&Number(o.odds)>1).slice(0,3).map(o=>String(o.outcomeName||"Outcome")+" @ "+Number(o.odds).toFixed(2));
@@ -1558,11 +1559,11 @@ async function verifiedAiContext(prompt){
         }).filter(Boolean).slice(0,3);
         return "- "+f.home+" vs "+f.away+" | "+String(f.league||"League unavailable")+" | "+new Date(Number(f.startTimeMs)).toLocaleString("en-NG",{timeZone:"Africa/Lagos",hour:"2-digit",minute:"2-digit",day:"2-digit",month:"short"})+" Lagos time"+(markets.length?" | "+markets.join(" ; "):"");
       });
-      sections.push("Real SportyBet football fixture feed for "+date+" (Lagos date): "+(rows.length?rows.join("\n"):"No fixtures were returned for this date."));
+      sections.push("Real SportyBet "+sport+" fixture feed for "+date+" (Lagos date): "+(rows.length?rows.join("\n"):"No fixtures were returned for this date."));
     }
-    if(/prediction|predictions|best pick|confidence/.test(q)){
+    if(/prediction|predictions|best pick|best games|recommend|confidence/.test(q)&&sport!=="table_tennis"){
       const date=dates[0]||base;
-      const picks=await buildBestPicks(date,8,"all","football");
+      const picks=await buildBestPicks(date,8,"all",sport);
       const rows=(Array.isArray(picks)?picks:[]).slice(0,8).map(p=>"- "+p.home+" vs "+p.away+" | "+String(p.market||p.marketType||"Market")+" | "+String(p.pick||"Pick")+" | odds "+(Number.isFinite(Number(p.odds))?Number(p.odds).toFixed(2):"unavailable")+" | model confidence "+(Number.isFinite(Number(p.confidence))?Math.round(Number(p.confidence))+"%":"unavailable"));
       sections.push("Current app prediction engine output for "+date+": "+(rows.length?rows.join("\n"):"No qualifying predictions were returned. Do not invent replacement picks."));
     }
@@ -1574,9 +1575,12 @@ async function verifiedAiContext(prompt){
 }
 app.post("/api/assistant/chat",requireAuth,async(req,res)=>{
   try{
+    const chatMessage=String(req.body?.message||"").trim();
+    if(!chatMessage)return res.status(400).json({ok:false,error:"Type a message first."});
+    if(chatMessage.length>2000)return res.status(400).json({ok:false,error:"Keep each message under 2,000 characters."});
     if(!allowAiChatRequest(req.user.id))return res.status(429).json({ok:false,error:"AI chat rate limit reached. Please wait a minute and try again."});
-    const context=await boundedAiContext(req.body?.message);
-    const result=await chatForUser({userId:req.user.id,conversationId:req.body?.conversationId,message:req.body?.message,context});
+    const context=await boundedAiContext(chatMessage);
+    const result=await chatForUser({userId:req.user.id,conversationId:req.body?.conversationId,message:chatMessage,context});
     res.json({ok:true,...result});
   }catch(error){
     if(error.code==="AI_PROVIDERS_UNAVAILABLE")return res.status(503).json({ok:false,code:error.code,error:error.message});
