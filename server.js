@@ -39,7 +39,13 @@ const BETRELAY_API_KEY=process.env.BETRELAY_API_KEY||"";
 async function betRelayFetch(pathname,options={}){if(!BETRELAY_API_KEY)throw new Error("Multi-bookmaker code service is not configured yet. Add BETRELAY_API_KEY to Railway.");const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);try{const res=await fetch(BETRELAY_BASE+pathname,{...options,headers:{Accept:"application/json","Content-Type":"application/json","X-API-Key":BETRELAY_API_KEY,...(options.headers||{})},signal:controller.signal});const text=await res.text();let body=null;try{body=text?JSON.parse(text):null}catch{}if(!res.ok)throw new Error(body?.message||("BetRelay HTTP "+res.status));if(!body)throw new Error("BetRelay returned an invalid response");return body}finally{clearTimeout(timer)}}
 function bookmakerById(id){return BOOKMAKERS.find(x=>x.id===String(id))}
 async function createSportyBooking(selections,sport="football"){
-  const fixtures=await getSportyFixtures(false,true,sport);
+  const requestedDates=[...new Set(selections.map(s=>String(s.date||"")).filter(d=>/^\\d{4}-\\d{2}-\\d{2}$/.test(d)))];
+  let fixtures=[];
+  if(requestedDates.length){
+    for(const date of requestedDates){const day=await getDayFixtures(date,true,sport);fixtures.push(...(day.fixtures||[]));}
+  }else{
+    fixtures=await getSportyFixtures(false,true,sport);
+  }
   const available=[],unavailable=[];
   for(const s of selections){
     const f=fixtures.find(x=>x.eventId===s.eventId);
