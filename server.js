@@ -1521,9 +1521,44 @@ app.get("/api/assistant/conversations/:id",requireAuth,async(req,res)=>{
     res.json({ok:true,messages});
   }catch(error){res.status(503).json({ok:false,error:"AI conversation history is temporarily unavailable."});}
 });
+async function verifiedAiContext(prompt){
+  const q=String(prompt||"").toLowerCase();
+  if(!/(fixture|fixtures|match|matches|upcoming|today|tomorrow|odds|league|market|prediction|predictions|best pick|confidence|score)/.test(q))return "";
+  const sections=[];
+  try{
+    const base=localDayKey(Date.now());
+    const dates=[];
+    const shift=(date,days)=>{const [y,m,d]=date.split("-").map(Number);return new Date(Date.UTC(y,m-1,d+days,12)).toISOString().slice(0,10)};
+    if(/\\btomorrow\\b/.test(q)&&!(/\\btoday\\b/.test(q)))dates.push(shift(base,1));
+    else dates.push(base);
+    if(/\\btoday\\b/.test(q)&&/\\btomorrow\\b/.test(q))dates.push(shift(base,1));
+    for(const date of [...new Set(dates)].slice(0,2)){
+      const result=await getDayFixtures(date,false,"football");
+      const rows=(result.fixtures||[]).filter(f=>f.home&&f.away).slice(0,10).map(f=>{
+        const markets=(f.markets||[]).slice(0,5).map(m=>{
+          const outcomes=(m.outcomes||[]).filter(o=>o.isActive!==false&&Number.isFinite(Number(o.odds))&&Number(o.odds)>1).slice(0,3).map(o=>String(o.outcomeName||"Outcome")+" @ "+Number(o.odds).toFixed(2));
+          return outcomes.length?String(m.marketName||"Market")+": "+outcomes.join(", "):"";
+        }).filter(Boolean).slice(0,3);
+        return "- "+f.home+" vs "+f.away+" | "+String(f.league||"League unavailable")+" | "+new Date(Number(f.startTimeMs)).toLocaleString("en-NG",{timeZone:"Africa/Lagos",hour:"2-digit",minute:"2-digit",day:"2-digit",month:"short"})+" Lagos time"+(markets.length?" | "+markets.join(" ; "):"");
+      });
+      sections.push("Real SportyBet football fixture feed for "+date+" (Lagos date): "+(rows.length?rows.join("\\n"):"No fixtures were returned for this date."));
+    }
+    if(/prediction|predictions|best pick|confidence/.test(q)){
+      const date=dates[0]||base;
+      const picks=await buildBestPicks(date,8,"all","football");
+      const rows=(Array.isArray(picks)?picks:[]).slice(0,8).map(p=>"- "+p.home+" vs "+p.away+" | "+String(p.market||p.marketType||"Market")+" | "+String(p.pick||"Pick")+" | odds "+(Number.isFinite(Number(p.odds))?Number(p.odds).toFixed(2):"unavailable")+" | model confidence "+(Number.isFinite(Number(p.confidence))?Math.round(Number(p.confidence))+"%":"unavailable"));
+      sections.push("Current app prediction engine output for "+date+": "+(rows.length?rows.join("\\n"):"No qualifying predictions were returned. Do not invent replacement picks."));
+    }
+  }catch(error){
+    sections.push("Live app data lookup failed for this request. Do not claim that live fixtures, odds, or predictions were checked; ask the user to use the app analyzer or try again.");
+    console.warn("AI live-context lookup failed:",String(error?.message||error).slice(0,200));
+  }
+  return sections.join("\\n\\n").slice(0,9000);
+}
 app.post("/api/assistant/chat",requireAuth,async(req,res)=>{
   try{
-    const result=await chatForUser({userId:req.user.id,conversationId:req.body?.conversationId,message:req.body?.message});
+    const context=await verifiedAiContext(req.body?.message);
+    const result=await chatForUser({userId:req.user.id,conversationId:req.body?.conversationId,message:req.body?.message,context});
     res.json({ok:true,...result});
   }catch(error){
     if(error.code==="AI_PROVIDERS_UNAVAILABLE")return res.status(503).json({ok:false,code:error.code,error:error.message});
