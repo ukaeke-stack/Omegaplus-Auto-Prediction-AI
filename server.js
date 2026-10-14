@@ -1577,7 +1577,9 @@ function userCanGenerateBookingCode(user){
   return Boolean(user && (user.role==="admin" || (["pro","premium"].includes(user.plan) && ["active","none"].includes(user.subscriptionStatus))));
 }
 function isBookingCodeIntent(message){
-  return /\b(booking\s*code|book(?:ing)?\s*(?:slip|code)|generate.{0,35}\bcode\b|create.{0,35}\bcode\b|make.{0,35}\bcode\b)\b/i.test(String(message||""));
+  const text=String(message||"");
+  return /\b(generate|create|make|get|give(?:\s+me)?|build|prepare|produce)\b.{0,55}\b(booking\s*code|code|booking\s*slip)\b/i.test(text)
+    || /\bbooking\s*code\b.{0,40}\b(for|with|today|tomorrow|\d+\s*(?:games|matches|fixtures))\b/i.test(text);
 }
 function normalizedBookingPrompt(message){
   let prompt=String(message||"").trim();
