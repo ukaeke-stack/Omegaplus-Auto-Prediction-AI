@@ -12,6 +12,7 @@ import {createTicket,listUserTickets,getOrCreateChat,listChatMessages,addChatMes
 import {initOfflineSyncDb,readOfflineRecords,writeOfflineRecords} from "./offline-sync.js";
 import {initSocialPublishingDb,publishDailyBestToSocials,getSocialPublishingStatus} from "./social-publishing.js";
 import {parseBookingAssistantPrompt} from "./booking-assistant.js";
+import {chatForUser,listUserConversations,getUserConversation} from "./ai-chat.js";
 import {smartPickRank,buildBetBuilder,performanceFromArchives,buildMatchReport,oddsMovement,extractOddsSnapshot} from "./advanced-features.js";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -1509,6 +1510,27 @@ async function selectAssistantFixtures(request){
   }
   return [...unique.values()].sort((a,b)=>b.confidence-a.confidence||a.startTimeMs-b.startTimeMs).slice(0,request.requestedGames);
 }
+app.get("/api/assistant/conversations",requireAuth,async(req,res)=>{
+  try{res.json({ok:true,conversations:await listUserConversations(req.user.id)});}
+  catch(error){res.status(503).json({ok:false,error:"AI conversation history is temporarily unavailable."});}
+});
+app.get("/api/assistant/conversations/:id",requireAuth,async(req,res)=>{
+  try{
+    if(!/^[0-9a-f-]{36}$/i.test(String(req.params.id||"")))return res.status(400).json({ok:false,error:"Invalid conversation ID."});
+    const messages=await getUserConversation(req.user.id,req.params.id);
+    res.json({ok:true,messages});
+  }catch(error){res.status(503).json({ok:false,error:"AI conversation history is temporarily unavailable."});}
+});
+app.post("/api/assistant/chat",requireAuth,async(req,res)=>{
+  try{
+    const result=await chatForUser({userId:req.user.id,conversationId:req.body?.conversationId,message:req.body?.message});
+    res.json({ok:true,...result});
+  }catch(error){
+    if(error.code==="AI_PROVIDERS_UNAVAILABLE")return res.status(503).json({ok:false,code:error.code,error:error.message});
+    const status=/Type a message|under 2,000|Invalid conversation ID|Conversation not found/.test(error.message||"")?400:503;
+    res.status(status).json({ok:false,error:status===400?error.message:"The AI assistant is temporarily unavailable. Your message has not produced a reply; try again shortly."});
+  }
+});
 app.post("/api/assistant/booking-request",requirePaid,async(req,res)=>{
   try{
     const request=parseAssistantBookingPrompt(req.body?.prompt);
