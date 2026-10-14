@@ -11,6 +11,14 @@ Independent deployment of the Omegaplus sports-prediction application. This repo
 - Health endpoint: `/health`
 - Tests: `npm test`
 
+## Offline-first storage
+
+The browser/PWA uses IndexedDB on each device to cache successful responses from the app's public prediction, fixture, result, and history read APIs for up to 7 days. The service worker caches the application shell so the interface can reopen offline. Cached data is only a snapshot: live fixtures, scores, and newly generated analysis still require internet access.
+
+The independent PostgreSQL database stores account data and a per-user offline-sync table. After login, the app synchronizes local settings and football/basketball slips across that user's devices. The sync API is authenticated and accepts only those record types; it does not sync passwords, session tokens, or admin data. Offline changes remain on the device until a connection and authenticated session are available.
+
+This does not connect to or migrate any data from Omegaplus Pro AI. The local IndexedDB belongs to the user's browser/device, and the online database belongs only to this app.
+
 ## Render deployment preparation
 
 1. Create a new Render Web Service from this repository, branch `main`.
