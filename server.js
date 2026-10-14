@@ -70,10 +70,6 @@ app.use((req,res,next)=>{
 });
 app.use(express.static(path.join(__dirname,"public")));
 
-app.get("/health",async(_req,res)=>{
-  res.status(200).json({ok:true,service:"omegaplus-auto-prediction-ai",version:APP_VERSION});
-});
-
 app.get("/api/offline-sync",requireAuth,async(req,res)=>{
   try{res.json({ok:true,records:await readOfflineRecords(req.user.id)});}
   catch(error){res.status(503).json({ok:false,error:"Offline synchronization is temporarily unavailable."});}
