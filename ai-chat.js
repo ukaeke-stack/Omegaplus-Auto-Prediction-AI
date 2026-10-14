@@ -121,3 +121,31 @@ export async function getUserConversation(userId, conversationId) {
   );
   return result.rows;
 }
+
+/** Save a deterministic booking workflow turn without asking an LLM to invent or execute it. */
+export async function saveAssistantExchange({ userId, conversationId, message, reply, provider = "booking-assistant" }) {
+  const db = await ensureSchema();
+  const userMessage = validateMessage(message);
+  const assistantReply = String(reply || "").trim().slice(0, 6000);
+  if (!assistantReply) throw new Error("A booking workflow reply is required.");
+  const id = conversationId ? String(conversationId) : crypto.randomUUID();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    throw new Error("Invalid conversation ID.");
+  }
+  if (conversationId) {
+    const owned = await db.query("SELECT id FROM public.ai_conversations WHERE id=$1 AND user_id=$2", [id, userId]);
+    if (!owned.rowCount) throw new Error("Conversation not found.");
+  } else {
+    await db.query(
+      "INSERT INTO public.ai_conversations(id,user_id,title) VALUES($1,$2,$3)",
+      [id, userId, userMessage.slice(0, 72)]
+    );
+  }
+  await db.query("INSERT INTO public.ai_messages(conversation_id,role,content) VALUES($1,'user',$2)", [id, userMessage]);
+  await db.query(
+    "INSERT INTO public.ai_messages(conversation_id,role,content,provider) VALUES($1,'assistant',$2,$3)",
+    [id, assistantReply, provider]
+  );
+  await db.query("UPDATE public.ai_conversations SET updated_at=now() WHERE id=$1", [id]);
+  return id;
+}
