@@ -9,6 +9,7 @@ import {applyDerivedModel} from "./model-ensemble.js";
 import {rankByReliability} from "./analyzer-reliability.js";
 import {analyzeCorrectScores} from "./correct-score.js";
 import {createTicket,listUserTickets,getOrCreateChat,listChatMessages,addChatMessage,adminTickets,updateTicket,adminThreads,adminMessages,adminAddMessage,setThreadStatus,initSupportDb} from "./support.js";
+import {initOfflineSyncDb,readOfflineRecords,writeOfflineRecords} from "./offline-sync.js";
 import {smartPickRank,buildBetBuilder,performanceFromArchives,buildMatchReport,oddsMovement,extractOddsSnapshot} from "./advanced-features.js";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -62,12 +63,27 @@ async function generateTargetBooking(target,selections,sport="football"){const t
 
 
 app.use(express.json({limit:"1mb",verify:(req,res,buf)=>{req.rawBody=Buffer.from(buf)}}));
-initAuthDb().then(ok=>{console.log("Account database:",ok?"ready":"not configured/unavailable");return initSupportDb()}).then(ok=>console.log("Support database:",ok?"ready":"not configured/unavailable"));
+initAuthDb().then(ok=>{console.log("Account database:",ok?"ready":"not configured/unavailable");return initSupportDb()}).then(ok=>{console.log("Support database:",ok?"ready":"not configured/unavailable");return initOfflineSyncDb()}).then(ok=>console.log("Offline sync database:",ok?"ready":"not configured/unavailable")).catch(err=>console.error("Database initialization failed:",err.message));
 app.use((req,res,next)=>{
   if(req.path==="/"||/\.(?:js|css|html|webmanifest)$/.test(req.path)) res.setHeader("Cache-Control","no-store, no-cache, must-revalidate, proxy-revalidate");
   next();
 });
 app.use(express.static(path.join(__dirname,"public")));
+
+app.get("/health",async(_req,res)=>{
+  res.status(200).json({ok:true,service:"omegaplus-auto-prediction-ai",version:APP_VERSION});
+});
+
+app.get("/api/offline-sync",requireAuth,async(req,res)=>{
+  try{res.json({ok:true,records:await readOfflineRecords(req.user.id)});}
+  catch(error){res.status(503).json({ok:false,error:"Offline synchronization is temporarily unavailable."});}
+});
+app.put("/api/offline-sync",requireAuth,async(req,res)=>{
+  try{
+    const records=await writeOfflineRecords(req.user.id,req.body?.records);
+    res.json({ok:true,records});
+  }catch(error){res.status(400).json({ok:false,error:error.message||"Could not synchronize offline data."});}
+});
 
 const MARKET_IDS=["1","10","11","14","16","18","26","29","36","60100","139","136","138","900304","900305","900312","162","165","166","172","186","187","188","189","219","223","225","227","228","251","256","258","274","275","276","406","410","412","414","415","900300","900301"];
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
