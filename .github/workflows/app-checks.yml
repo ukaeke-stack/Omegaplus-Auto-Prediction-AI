@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, feature/offline-first-database, feature/social-automation-voice-assistant]
+    branches: [main, feature/offline-first-database, feature/social-automation-voice-assistant, feature/multi-provider-ai-assistant]
   workflow_dispatch:
 
 jobs:
@@ -17,6 +17,9 @@ jobs:
           node-version: 20
       - run: npm install
       - run: node --check server.js
+      - run: node --check ai-providers.js
+      - run: node --check ai-chat.js
+      - run: node --check public/ai-chat.js
       - run: node --check booking-assistant.js
       - run: node --check auth.js
       - run: node --check support.js
