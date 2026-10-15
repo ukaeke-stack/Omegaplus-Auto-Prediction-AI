@@ -474,3 +474,27 @@ button:disabled{opacity:.5}
   #page-home .home-side-column{grid-template-columns:minmax(0,1fr)}
   #page-home .today-picks .slip-card{padding:14px}
 }
+
+
+/* Bring the conversational AI panel into the refreshed navy, lime and cyan design system. */
+.ai-chat-panel{
+  border-color:#293b54!important;
+  border-radius:18px!important;
+  background:linear-gradient(145deg,#111d30,#0b1422)!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.18)!important;
+  color:#edf4ff;
+}
+.ai-chat-head small,.ai-chat-message>small,.ai-chat-booking-heading span,
+.ai-chat-booking-code>small{color:#b7f34b!important}
+.ai-chat-head p,.ai-chat-note,.ai-chat-message .ai-chat-provider,
+.ai-chat-booking-preview>p,.ai-chat-booking-code>p,
+.ai-chat-booking-row small{color:#9aabc0!important}
+.ai-chat-messages{background:#091321!important;border-color:#293b54!important}
+.ai-chat-message{background:#14243a!important;color:#edf4ff!important}
+.ai-chat-message.user{background:#1b3445!important;border:1px solid #2b5366}
+.ai-chat-message>div{color:#edf4ff!important}
+.ai-chat-compose textarea{background:#091321!important;border-color:#30445f!important;color:#edf4ff!important}
+.ai-chat-booking-preview,.ai-chat-booking-code{background:#101e2e!important;border-color:rgba(183,243,75,.35)!important}
+.ai-chat-booking-row{background:#0a1524!important}
+.ai-chat-booking-warning{color:#f0d48c!important}
+.ai-chat-share-link{border-color:#30445f!important;color:#edf4ff!important}
