@@ -60,6 +60,38 @@ function validateMessage(message) {
   return value;
 }
 
+function buildBasicReply(message) {
+  const text = String(message || "").trim().toLowerCase();
+  if (/^(hi|hello|hey|good morning|good afternoon|good evening|howdy)[!.? ]*$/.test(text)) {
+    return "Hello. I’m Omegaplus AI. I can help you understand the app, use the Fixture Analyzer, explain prediction markets, and guide you through reviewing selections. What would you like help with?";
+  }
+  if (/\\b(who are you|what are you|your name)\\b/.test(text)) {
+    return "I’m Omegaplus AI, the assistant for Omegaplus Auto Prediction AI. I can explain app features, prediction terminology, and the booking workflow. Advanced open-ended answers require the AI service to be available.";
+  }
+  if (/\\b(help|what can you do|features|how do i use|how to use)\\b/.test(text)) {
+    return "I can help with the Fixture Analyzer, choosing a sport, league, date and market, understanding prediction labels and odds, and reviewing selections before a booking code is requested. For live fixtures and odds, use the app’s analyzer because I should not guess current data.";
+  }
+  if (/\\b(fixture analyzer|analyzer|analyze matches|find matches)\\b/.test(text)) {
+    return "To use the Fixture Analyzer, choose the sport, date, league and market, then run the analysis. Review each fixture, market and displayed odds before using a selection. Live availability can change, so refresh the analyzer before requesting a booking code.";
+  }
+  if (/\\b(booking code|booking slip|sportybet)\\b/.test(text)) {
+    return "For a booking slip, specify the number of football games, the Over/Under goal line (0.5, 1.5, 2.5, 3.5 or 4.5), and the date or dates. Review the returned fixtures and odds first. The app requests a SportyBet code only when you press Generate booking code, and it must recheck the markets.";
+  }
+  if (/\\b(odds|market|over\\s*\\/?\\s*under|btts|both teams|double chance|1x2)\\b/.test(text)) {
+    return "Quick guide: 1X2 means home win, draw or away win; BTTS means both teams to score; Over/Under compares total goals with a stated line; Double Chance covers two of the three 1X2 outcomes. Odds are not guarantees, and selections should be checked against the current market.";
+  }
+  if (/\\b(prediction|predict|guaranteed|sure win|100%|accuracy)\\b/.test(text)) {
+    return "Predictions are estimates, not guarantees. Check the displayed confidence, supporting statistics, market and current odds, and never treat a pick as a certain result. I can’t verify live match data unless it is provided by the app’s analyzer.";
+  }
+  if (/\\b(thank you|thanks|cheers)\\b/.test(text)) {
+    return "You’re welcome. If you need help with a feature, tell me which page or step you’re using.";
+  }
+  if (/\\b(bye|goodbye|see you)\\b/.test(text)) {
+    return "Goodbye. You can return any time you need help using Omegaplus Auto Prediction AI.";
+  }
+  return "I received your message. Basic assistant mode is available, but the advanced AI service is currently unavailable. I can still help with Omegaplus app navigation, the Fixture Analyzer, prediction markets, and the booking-code workflow. For a broader question, please try again when the advanced AI service is restored.";
+}
+
 export async function chatForUser({ userId, conversationId, message, context = "" }) {
   const db = await ensureSchema();
   const content = validateMessage(message);
@@ -89,18 +121,26 @@ export async function chatForUser({ userId, conversationId, message, context = "
     { role: "user", content }
   ];
 
+  let result;
   try {
-    const result = await generateWithFallback({ messages });
+    result = await generateWithFallback({ messages });
+  } catch (error) {
+    // Basic app-focused replies remain available when no AI provider key is
+    // configured or every advanced provider is temporarily unavailable.
+    const reply = buildBasicReply(content);
     await db.query(
       "INSERT INTO public.ai_messages(conversation_id,role,content,provider) VALUES($1,'assistant',$2,$3)",
-      [id, result.reply, result.provider]
+      [id, reply, "built-in-basic"]
     );
     await db.query("UPDATE public.ai_conversations SET updated_at=now() WHERE id=$1", [id]);
-    return { conversationId: id, reply: result.reply, provider: result.provider, fallbackUsed: result.fallbackUsed };
-  } catch (error) {
-    await db.query("UPDATE public.ai_conversations SET updated_at=now() WHERE id=$1", [id]).catch(() => {});
-    throw error;
+    return { conversationId: id, reply, provider: "built-in-basic", fallbackUsed: true, basicMode: true };
   }
+  await db.query(
+    "INSERT INTO public.ai_messages(conversation_id,role,content,provider) VALUES($1,'assistant',$2,$3)",
+    [id, result.reply, result.provider]
+  );
+  await db.query("UPDATE public.ai_conversations SET updated_at=now() WHERE id=$1", [id]);
+  return { conversationId: id, reply: result.reply, provider: result.provider, fallbackUsed: result.fallbackUsed, basicMode: false };
 }
 
 export async function listUserConversations(userId, limit = 20) {
