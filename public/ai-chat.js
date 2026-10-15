@@ -101,7 +101,7 @@ async function sendMessage(){
     appendBookingPreview(result.bookingPreview);
   }
   status(result.provider==="booking-assistant"?"Booking request prepared. Review the selections before generating a code.":"Answered by "+result.provider+(result.fallbackUsed?" after a provider fallback.":".")); 
-  if($("#aiChatSpeak")?.checked&&window.SpeechSynthesisUtterance){try{speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(result.reply))}catch{}}
+  if($("#aiChatSpeak")?.checked){try{if(window.AndroidApp?.speakText){window.AndroidApp.speakText(String(result.reply||""));}else if(window.speechSynthesis&&window.SpeechSynthesisUtterance){window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(String(result.reply||""));utterance.lang="en-NG";utterance.rate=0.96;utterance.pitch=1;window.speechSynthesis.speak(utterance);}}catch(e){status("Reply received, but audio playback failed. Check the device volume and text-to-speech settings.");}}
  }catch(error){
   if(box){const pending=box.querySelector(".pending");if(pending)pending.remove()}
   status(error.message);
@@ -110,13 +110,13 @@ async function sendMessage(){
 function listen(){
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){status("Voice input is not supported by this browser. Type your message instead.");return}
- const rec=new SR();rec.lang="en-NG";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;
+ const rec=new SR();rec.lang="en-NG";rec.continuous=false;rec.interimResults=false;rec.maxAlternatives=1;
  const btn=$("#aiChatMic");btn.disabled=true;btn.textContent="Listening…";
  let transcript="",silenceTimer=null,submitted=false;
  const finish=()=>{if(submitted)return;submitted=true;clearTimeout(silenceTimer);try{rec.stop()}catch{};const text=transcript.trim();if(!text){status("I didn't catch a complete message. Please speak again or type it.");return}
- const input=$("#aiChatInput");if(!input)return;input.value=(input.value?input.value+" ":"")+text;input.focus();status("You’ve finished speaking. Sending your message…");sendMessage()};
- rec.onresult=e=>{let combined="";for(let i=0;i<e.results.length;i++){const result=e.results[i];if(result&&result[0])combined+=result[0].transcript+" "}transcript=combined.trim();clearTimeout(silenceTimer);silenceTimer=setTimeout(finish,2200)};
- rec.onerror=e=>{clearTimeout(silenceTimer);status(e.error==="not-allowed"?"Microphone permission was denied. Allow microphone access or type your message.":"Voice input failed. Type your message instead.")};
+ const input=$("#aiChatInput");if(!input)return;input.value=text;input.focus();status("You’ve finished speaking. Sending your message…");sendMessage()};
+ rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){const result=e.results[i];if(result&&result.isFinal&&result[0]){transcript=String(result[0].transcript||"").trim();break}}clearTimeout(silenceTimer);if(transcript)silenceTimer=setTimeout(finish,900)};
+ rec.onerror=e=>{clearTimeout(silenceTimer);submitted=true;status(e.error==="not-allowed"?"Microphone permission was denied. Allow microphone access or type your message.":"Voice input failed. Type your message instead.")};
  rec.onend=()=>{clearTimeout(silenceTimer);btn.disabled=false;btn.textContent="Speak";if(!submitted&&transcript.trim())finish()};
  try{rec.start();status("Listening. I’ll wait for about two seconds of silence before sending your message.")}catch{btn.disabled=false;btn.textContent="Speak";status("Could not start microphone input. Check browser microphone permission and try again.")}
 }
@@ -124,7 +124,7 @@ function init(){
  const page=$("#page-voice-assistant"),intro=page?.querySelector(".page-title > p");
  if(!page||!intro||$("#aiChatPanel"))return;
  const panel=document.createElement("section");panel.className="ai-chat-panel";panel.id="aiChatPanel";
- panel.innerHTML='<div class="ai-chat-head"><div><small>MULTI-PROVIDER AI</small><h3>Ask Omegaplus AI</h3><p>Groq → Gemini → Ollama Cloud fallback. Conversations are saved to your account.</p></div><button type="button" class="secondary" id="aiChatNew">New chat</button></div><div id="aiChatMessages" class="ai-chat-messages" aria-live="polite"><div class="ai-chat-empty">Loading your conversation…</div></div><div class="ai-chat-compose"><label for="aiChatInput">Message</label><textarea id="aiChatInput" rows="3" maxlength="2000" placeholder="Ask a question or follow up on your previous message…"></textarea><div class="ai-chat-actions"><button type="button" class="secondary" id="aiChatMic">Speak</button><label class="ai-chat-speak"><input type="checkbox" id="aiChatSpeak"> Read replies aloud</label><button type="button" class="primary" id="aiChatSend">Send message</button></div></div><div class="analysis-status" id="aiChatStatus" role="status" aria-live="polite">Connecting to your saved conversations…</div><p class="ai-chat-note">AI replies can be wrong. Booking-code requests show a reviewable slip first; generating a code does not place a bet.</p>';
+ panel.innerHTML='<div class="ai-chat-head"><div><small>MULTI-PROVIDER AI</small><h3>Ask Omegaplus AI</h3><p>Groq → Gemini → Ollama Cloud fallback. Conversations are saved to your account.</p></div><button type="button" class="secondary" id="aiChatNew">New chat</button></div><div id="aiChatMessages" class="ai-chat-messages" aria-live="polite"><div class="ai-chat-empty">Loading your conversation…</div></div><div class="ai-chat-compose"><label for="aiChatInput">Message</label><textarea id="aiChatInput" rows="3" maxlength="2000" placeholder="Ask a question or follow up on your previous message…"></textarea><div class="ai-chat-actions"><button type="button" class="secondary" id="aiChatMic">Speak</button><label class="ai-chat-speak"><input type="checkbox" id="aiChatSpeak" checked> Read replies aloud</label><button type="button" class="primary" id="aiChatSend">Send message</button></div></div><div class="analysis-status" id="aiChatStatus" role="status" aria-live="polite">Connecting to your saved conversations…</div><p class="ai-chat-note">AI replies can be wrong. Booking-code requests show a reviewable slip first; generating a code does not place a bet.</p>';
  intro.insertAdjacentElement("afterend",panel);
  $("#aiChatSend").addEventListener("click",sendMessage);
  $("#aiChatInput").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage()}});
