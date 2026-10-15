@@ -54,7 +54,7 @@ Configure these Render environment variables only on the Auto Prediction AI serv
 - `SOCIAL_PUBLISHING_ENABLED` — keep `false` until you are ready to publish; set to `true` to enable scheduled and manual posting.
 - `APP_BASE_URL` — the public URL of the Auto Prediction AI service.
 
-Also add `APP_BASE_URL` and `CRON_SECRET` as GitHub Actions repository secrets. The workflow in `.github/workflows/social-publishing.yml` triggers the protected endpoint daily at 09:00 UTC (10:00 in Nigeria). GitHub Actions schedules can be delayed, so this is a daily automation rather than an exact-time guarantee. An administrator can trigger a post manually via the authenticated admin endpoint, and inspect configuration/recent outcomes through the admin status endpoint.
+Also add `APP_BASE_URL` and `CRON_SECRET` as GitHub Actions repository secrets. The workflow in `.github/workflows/social-publishing.yml` triggers the protected endpoint daily at 23:00 UTC (00:00 midnight in Nigeria, Africa/Lagos time) so the app can build/check that day's Daily Best selections and publish them. GitHub Actions schedules can be delayed, so this is a daily automation rather than an exact-time guarantee. If no quality-qualified selections are available at the time of the run, the endpoint skips posting; an administrator can trigger a post manually via the authenticated admin endpoint and inspect configuration/recent outcomes through the admin status endpoint.
 
 Publishing is text-only in this initial version. Social credentials must never be committed to GitHub, placed in the client app, or copied from Omegaplus Pro AI. Test with credentials and accounts owned or authorized by the app owner before enabling the schedule.
 
