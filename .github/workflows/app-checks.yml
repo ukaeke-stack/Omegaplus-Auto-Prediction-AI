@@ -27,5 +27,8 @@ jobs:
       - run: node --check public/offline-first.js
       - run: node --check social-publishing.js
       - run: node --check public/voice-assistant.js
+      - run: node --check public/admin.js
+      - run: node --check public/admin-support.js
+      - run: node --check public/app-notifications.js
       - run: node --check public/sw.js
       - run: npm test
