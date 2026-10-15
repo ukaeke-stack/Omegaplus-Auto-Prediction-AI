@@ -19,7 +19,7 @@ test("supports BTTS Yes and BTTS No as separate exact options",()=>{
 });
 
 test("supports best games across any market",()=>{
-  const request=parseBookingAssistantPrompt("SportyBet best 20 games from any options, markets or leagues today","2026-10-14");
+  const request=parseBookingAssistantPrompt("SportyBet best 20 football games from any options, markets or leagues today","2026-10-14");
   assert.equal(request.requestedGames,20);
   assert.equal(request.criteria[0].type,"any");
 });
