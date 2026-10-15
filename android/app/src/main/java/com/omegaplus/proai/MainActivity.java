@@ -32,6 +32,7 @@ public class MainActivity extends Activity {
     private PermissionRequest pendingWebPermission;
     private TextToSpeech textToSpeech;
     private boolean ttsReady=false;
+    private String pendingSpeechText="";
 
     public class AppBridge {
         @JavascriptInterface public String getVersionName(){try{PackageInfo i=getPackageManager().getPackageInfo(getPackageName(),0);return i.versionName!=null?i.versionName:"";}catch(Exception e){return "";}}
