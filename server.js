@@ -14,6 +14,7 @@ import {initSocialPublishingDb,publishDailyBestToSocials,getSocialPublishingStat
 import {parseBookingAssistantPrompt} from "./booking-assistant.js";
 import {chatForUser,listUserConversations,getUserConversation,saveAssistantExchange} from "./ai-chat.js";
 import {smartPickRank,buildBetBuilder,performanceFromArchives,buildMatchReport,oddsMovement,extractOddsSnapshot} from "./advanced-features.js";
+import {summarizePredictionCalibration} from "./prediction-calibration.js";
 import path from "node:path";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
