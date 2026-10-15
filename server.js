@@ -1462,8 +1462,9 @@ app.post("/api/snap-predict/analyze-image",requirePaid,async(req,r)=>{
         (/\baway win\b|\baway\b|\b2\s*x\s*2\b/.test(localContext)?directAway:
          /\bdraw\b/.test(localContext)?directDraw:
          /\bhome win\b|\bhome\b|direct winning|1x2|match winner/.test(localContext)?directHome:null);
-      const selected=selectionHint||picks[0];
-      matches.push({...selected,selectionType:selectionHint?"original":"recommendation",marketOptions:picks.slice(0,8),selectedMarketId:selected.marketId,selectedSpecifier:selected.specifier||"",selectedOutcomeId:selected.outcomeId,matchConfidence:100,matchMethod:"Exact team-name match"});
+      const selected=selectionHint;
+      const recommendation=selectionHint?null:(picks[0]||null);
+      matches.push({...(selected||{}),eventId:fixture.eventId,home:fixture.home,away:fixture.away,league:fixture.league||"",startTimeMs:fixture.startTimeMs||null,market:selected?.market||"",pick:selected?.pick||"",odds:selected?.odds??null,confidence:selected?.confidence??null,selectionType:selected?"original":"unread",recommendation:recommendation?{...recommendation}:null,marketOptions:picks.slice(0,8),selectedMarketId:selected?.marketId||"",selectedSpecifier:selected?.specifier||"",selectedOutcomeId:selected?.outcomeId||"",matchConfidence:100,matchMethod:"Exact team-name match"});
     }
     if(!matches.length)return r.json({ok:true,total:0,matches:[],ocrText:text,message:"The screenshot text was read, but no fixture with both recognizable team names matched the current SportyBet feed. Try a clearer image showing the full team names."});
     r.json({ok:true,total:matches.length,matches:matches.slice(0,30),source:"SportyBet live markets",probabilityNote:"The displayed chance is an odds-implied estimate for the identified selection (for example, Home win), not a guarantee or independently verified win probability."});
