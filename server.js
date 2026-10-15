@@ -1622,11 +1622,17 @@ app.post("/api/assistant/chat",requireAuth,async(req,res)=>{
     const result=await chatForUser({userId:req.user.id,conversationId:req.body?.conversationId,message:chatMessage,context});
     res.json({ok:true,...result});
   }catch(error){
-    if(error.code==="AI_PROVIDERS_UNAVAILABLE")return res.status(503).json({ok:false,code:error.code,error:error.message});
+    // Log sanitized provider failure details only; never log prompts or credentials.
+    if(error.code==="AI_PROVIDERS_UNAVAILABLE"){
+      console.error("AI assistant providers unavailable",JSON.stringify((error.providerErrors||[]).map(item=>({provider:item.provider,error:String(item.error||"failed").slice(0,180)}))));
+      return res.status(503).json({ok:false,code:error.code,error:error.message});
+    }
+    console.error("AI assistant chat request failed",String(error?.message||"unknown error").slice(0,240));
     const status=/Type a message|under 2,000|Invalid conversation ID|Conversation not found/.test(error.message||"")?400:503;
     res.status(status).json({ok:false,error:status===400?error.message:"The AI assistant is temporarily unavailable. Your message has not produced a reply; try again shortly."});
   }
 });
+
 app.post("/api/assistant/booking-code",requireAuth,requirePaid,async(req,res)=>{
   try{
     if(!(await getAdminSettings()).bookingCodeEnabled)return res.status(503).json({ok:false,error:"Booking-code generation is temporarily disabled by the administrator."});
