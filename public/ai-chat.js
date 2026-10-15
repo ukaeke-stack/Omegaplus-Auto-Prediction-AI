@@ -110,15 +110,17 @@ async function sendMessage(){
 function listen(){
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){status("Voice input is not supported by this browser. Type your message instead.");return}
- const rec=new SR();rec.lang="en-NG";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;
- const btn=$("#aiChatMic");btn.disabled=true;btn.textContent="Listening…";
- let transcript="",silenceTimer=null,submitted=false;
- const finish=()=>{if(submitted)return;submitted=true;clearTimeout(silenceTimer);try{rec.stop()}catch{};const text=transcript.trim();if(!text){status("I didn't catch a complete message. Please speak again or type it.");return}
- const input=$("#aiChatInput");if(!input)return;input.value=(input.value?input.value+" ":"")+text;input.focus();status("You’ve finished speaking. Sending your message…");sendMessage()};
- rec.onresult=e=>{let combined="";for(let i=0;i<e.results.length;i++){const result=e.results[i];if(result&&result[0])combined+=result[0].transcript+" "}transcript=combined.trim();clearTimeout(silenceTimer);silenceTimer=setTimeout(finish,2200)};
- rec.onerror=e=>{clearTimeout(silenceTimer);status(e.error==="not-allowed"?"Microphone permission was denied. Allow microphone access or type your message.":"Voice input failed. Type your message instead.")};
- rec.onend=()=>{clearTimeout(silenceTimer);btn.disabled=false;btn.textContent="Speak";if(!submitted&&transcript.trim())finish()};
- try{rec.start();status("Listening. I’ll wait for about two seconds of silence before sending your message.")}catch{btn.disabled=false;btn.textContent="Speak";status("Could not start microphone input. Check browser microphone permission and try again.")}
+ const btn=$("#aiChatMic");if(!btn||busy)return;
+ const rec=new SR();rec.lang="en-NG";rec.continuous=false;rec.interimResults=true;rec.maxAlternatives=1;
+ btn.disabled=true;btn.textContent="Listening…";
+ let finalTranscript="",interimTranscript="",silenceTimer=null,submitted=false,finished=false;
+ const restore=()=>{clearTimeout(silenceTimer);btn.disabled=false;btn.textContent="Speak"};
+ const finish=()=>{if(submitted)return;submitted=true;finished=true;clearTimeout(silenceTimer);try{rec.stop()}catch{};const text=(finalTranscript+" "+interimTranscript).trim();restore();if(!text){status("I didn't catch a complete message. Please speak again or type it.");return}
+ const input=$("#aiChatInput");if(!input)return;input.value=text;input.focus();status("You’ve finished speaking. Sending your message…");sendMessage()};
+ rec.onresult=e=>{interimTranscript="";for(let i=e.resultIndex;i<e.results.length;i++){const result=e.results[i];if(!result||!result[0])continue;if(result.isFinal){finalTranscript+=(finalTranscript?" ":"")+result[0].transcript.trim();interimTranscript=""}else interimTranscript=result[0].transcript.trim()}clearTimeout(silenceTimer);silenceTimer=setTimeout(finish,1800)};
+ rec.onerror=e=>{clearTimeout(silenceTimer);finished=true;restore();status(e.error==="not-allowed"||e.error==="service-not-allowed"?"Microphone access was denied by Android or the app. Allow microphone permission in Android Settings, then try again.":"Voice input failed ("+e.error+"). Type your message instead.")};
+ rec.onend=()=>{restore();if(!submitted&&!finished&&(finalTranscript||interimTranscript).trim())finish();else if(!submitted&&!finished)status("Listening stopped. Tap Speak to try again.")};
+ try{rec.start();status("Listening. Speak once, then pause briefly to send your message.")}catch{finished=true;restore();status("Could not start microphone input. Check Android app microphone permission and try again.")}
 }
 function init(){
  const page=$("#page-voice-assistant"),intro=page?.querySelector(".page-title > p");
