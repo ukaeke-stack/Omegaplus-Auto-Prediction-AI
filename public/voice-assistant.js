@@ -37,7 +37,7 @@ async function submitPrompt(options={}){
  const home=Boolean(options.home),input=$("#assistantPrompt"),prompt=String(options.prompt??input?.value??"").trim();
  if(!prompt){if(home)showHomeStatus("Type or say what you want help with.");else setStatus("Type or say what you want help with.");return}
  if(input&&options.prompt!==undefined)input.value=prompt;
- if(lastSelections.length&&/\\b(generate|create|make|get)\\b.{0,35}\\b(booking\\s*code|code)\\b/i.test(prompt)){
+ if(lastSelections.length&&/\b(generate|create|make|get)\b.{0,35}\b(booking\s*code|code)\b/i.test(prompt)){
    if(home){showHomeStatus("Generating the booking code for the reviewed selections…");openAssistantPage()}
    setStatus("Generating the booking code for the reviewed selections…");
    await generateCode();
@@ -46,7 +46,7 @@ async function submitPrompt(options={}){
    return;
  }
  let searchPrompt=prompt,excludeEventIds=[],previousSelections=[];
- if(lastSelections.length&&lastRequest&&/\\b(look for more|find more|search more|add more|more games|more selections)\\b/i.test(prompt)){
+ if(lastSelections.length&&lastRequest&&/\b(look for more|find more|search more|add more|more games|more selections)\b/i.test(prompt)){
    const criteria=(lastRequest.criteria||[]).map(c=>c.type==="any"?"best games from any markets":c.label).filter(Boolean).join(" and ")||lastRequest.marketLabel;
    const dates=(lastRequest.dateLabels||["Today"]).join(" and ").toLowerCase();
    const remaining=Math.max(1,Number(lastRequest.requestedGames||20)-lastSelections.length);
