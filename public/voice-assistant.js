@@ -28,7 +28,9 @@ function render(d){
  '<div class="control-actions"><button class="primary" id="assistantGenerateCode" '+(lastSelections.length?"":"disabled")+'>Generate booking code</button><button class="secondary" id="assistantImage" '+(lastSelections.length?"":"disabled")+'>Save slip image</button></div><div class="analysis-status" id="assistantBookingStatus">You can ask me to find more or add another market.</div><div id="assistantBookingResult" hidden></div>';
  $("#assistantImage").onclick=()=>drawSlipImage("");
  $("#assistantGenerateCode").onclick=generateCode;
- setStatus(d.message||"Selections ready for review.");
+ const reply=String(d.message||"");
+ if(reply){addSpeakButton(box.querySelector(".assistant-result-summary"),reply);if(!say(reply))setStatus("Reply displayed. Tap Speak reply to hear the summary.");}
+ setStatus(reply||"Selections ready for review.");
 }
 function showHomeStatus(text){const host=$(".assistant-home-launch");if(!host)return;let status=$("#assistantHomeStatus");if(!status){status=document.createElement("div");status.id="assistantHomeStatus";status.className="analysis-status";status.setAttribute("role","status");status.setAttribute("aria-live","polite");host.appendChild(status)}status.textContent=text;return status}
 function showHomeReply(text,isError=false){const host=$(".assistant-home-launch");if(!host)return;let reply=$("#assistantHomeReply");if(!reply){reply=document.createElement("div");reply.id="assistantHomeReply";reply.className="assistant-result-summary";host.appendChild(reply)}reply.hidden=false;reply.textContent=text;reply.style.whiteSpace="pre-wrap";reply.style.overflowWrap="anywhere";reply.style.borderLeft=isError?"3px solid #ef4444":"3px solid #18e76b";reply.style.padding="10px 12px";return reply}
