@@ -68,6 +68,16 @@ async function sendMessage(){
    await generateChatBookingCode();
    return;
  }
+ let requestMessage=message,excludeEventIds=[],priorBooking=null;
+ if(pendingBooking&&/\\b(look for more|find more|search more|add more|more games|more selections)\\b/i.test(message)){
+   priorBooking=pendingBooking;
+   const request=priorBooking.request||{};
+   const criteria=(request.criteria||[]).map(c=>c.type==="any"?"best games from any markets":c.label).filter(Boolean).join(" and ")||request.marketLabel||"the same market";
+   const dates=(request.dateLabels||["Today"]).join(" and ").toLowerCase();
+   const remaining=Math.max(1,Number(request.requestedGames||20)-(priorBooking.selections||[]).length);
+   requestMessage="Find "+remaining+" football games for "+criteria+" "+dates+" for SportyBet";
+   excludeEventIds=(priorBooking.selections||[]).map(x=>String(x.eventId));
+ }
  busy=true;$("#aiChatSend").disabled=true;$("#aiChatMic").disabled=true;$("#aiChatNew").disabled=true;
  const box=$("#aiChatMessages");
  if(box&&box.querySelector(".ai-chat-empty"))box.innerHTML="";
@@ -75,11 +85,21 @@ async function sendMessage(){
  if(box)box.innerHTML=existing+'<article class="ai-chat-message user"><small>YOU</small><div>'+esc(message).replace(/\n/g,"<br>")+'</div></article><article class="ai-chat-message assistant pending"><small>OMEGAPLUS AI</small><div>Thinking…</div></article>';
  input.value="";scrollBottom();status("Trying the configured AI providers…");
  try{
-  const result=await api("/api/assistant/chat",{method:"POST",body:JSON.stringify({message,conversationId})});
+  const result=await api("/api/assistant/chat",{method:"POST",body:JSON.stringify({message:requestMessage,conversationId,excludeEventIds})});
   conversationId=result.conversationId;
   const history=await api("/api/assistant/conversations/"+encodeURIComponent(conversationId));
   renderMessages(history.messages||[]);
-  if(result.bookingPreview)appendBookingPreview(result.bookingPreview);
+  if(result.bookingPreview){
+    if(priorBooking){
+      result.bookingPreview.selections=[...(priorBooking.selections||[]),...(result.bookingPreview.selections||[])];
+      result.bookingPreview.request.requestedGames=priorBooking.request?.requestedGames||result.bookingPreview.request.requestedGames;
+      result.bookingPreview.request.marketLabel=priorBooking.request?.marketLabel||result.bookingPreview.request.marketLabel;
+      result.bookingPreview.request.dateLabels=priorBooking.request?.dateLabels||result.bookingPreview.request.dateLabels;
+      result.bookingPreview.request.criteria=priorBooking.request?.criteria||result.bookingPreview.request.criteria;
+      result.bookingPreview.warnings=result.bookingPreview.selections.length<result.bookingPreview.request.requestedGames?["Found "+result.bookingPreview.selections.length+" total selections so far; no filler games were added."]:[];
+    }
+    appendBookingPreview(result.bookingPreview);
+  }
   status(result.provider==="booking-assistant"?"Booking request prepared. Review the selections before generating a code.":"Answered by "+result.provider+(result.fallbackUsed?" after a provider fallback.":".")); 
   if($("#aiChatSpeak")?.checked&&window.SpeechSynthesisUtterance){try{speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(result.reply))}catch{}}
  }catch(error){
