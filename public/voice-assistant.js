@@ -105,7 +105,7 @@ async function generateCode(){
 }
 async function voice(promptSelector="#assistantPrompt",buttonSelector="#assistantMic"){
  await loadAssistantConfig();
- if(!assistantConfig.assistantEnabled||!assistantConfig.voiceInputEnabled){setStatus("Voice input is temporarily disabled by the administrator.");return}
+ if(!assistantConfig.assistantEnabled||!assistantConfig.voiceInputEnabled){const msg="Voice input is temporarily disabled by the administrator.";if(promptSelector==="#assistantPromptHome")showHomeStatus(msg);else setStatus(msg);return}
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){setStatus("Voice input is not supported by this browser. You can type the request instead.");return}
  const rec=new SR();rec.lang="en-NG";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;
