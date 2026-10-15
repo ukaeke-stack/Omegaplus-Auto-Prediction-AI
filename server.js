@@ -1639,14 +1639,14 @@ app.post("/api/assistant/chat",requireAuth,async(req,res)=>{
       let request;
       try{request=parseBookingAssistantPrompt(normalizedBookingPrompt(chatMessage));}
       catch(error){
-        const reply="I can prepare a SportyBet football booking slip. Please specify the number of games, an Over/Under goal line (0.5, 1.5, 2.5, 3.5 or 4.5), and dates. Example: Generate a booking code for 5 football games, Over 2.5 goals, today and tomorrow.";
+        const reply=error.message+" Tell me the number of games and date if you have not already. Example: Find 20 football games for BTTS Yes today.";
         const conversationId=await saveAssistantExchange({userId:req.user.id,conversationId:req.body?.conversationId,message:chatMessage,reply});
         return res.json({ok:true,conversationId,reply,provider:"booking-assistant",bookingPreview:null});
       }
       const selections=await selectAssistantFixtures(request);
       const reply=selections.length
-        ? "I found "+selections.length+" distinct available selections for "+request.marketLabel+" across "+request.dates.map(d=>d.label.toLowerCase()).join(", ")+". Review every match and its current odds below. I will request a booking code only after you press Generate booking code."
-        : "I couldn't find any active matching selections for "+request.marketLabel+" on the requested dates. I won't add filler matches. Try another date or goal line.";
+        ? "Found "+selections.length+" qualified "+request.marketLabel+" selections for "+request.dates.map(d=>d.label.toLowerCase()).join(", ")+". Would you like me to generate the booking code, look for more, or mix in another market?"
+        : "I couldn't find qualified "+request.marketLabel+" selections for "+request.dates.map(d=>d.label.toLowerCase()).join(", ")+". I won't substitute another market. Would you like to try another date or change the option?";
       const conversationId=await saveAssistantExchange({userId:req.user.id,conversationId:req.body?.conversationId,message:chatMessage,reply});
       const bookingPreview=selections.length?{
         request:{requestedGames:request.requestedGames,sport:request.sport,bookmaker:request.bookmaker,direction:request.direction,line:request.line,marketLabel:request.marketLabel,dates:request.dates.map(d=>d.date),dateLabels:request.dates.map(d=>d.label)},
