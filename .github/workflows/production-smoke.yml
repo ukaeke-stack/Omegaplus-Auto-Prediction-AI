@@ -17,26 +17,26 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Wait for production health endpoint
+      - name: Wait for the new calibration API to reach production
         run: |
-          for attempt in $(seq 1 18); do
-            if curl --silent --show-error --fail --max-time 10 "https://omegaplus-auto-prediction-ai.onrender.com/health" -o /tmp/health.json; then
-              node -e 'const d=require("/tmp/health.json"); if(d.status!=="healthy"||d.service!=="omegaplus-auto-prediction-ai") process.exit(1); console.log("Production health endpoint is healthy:", d.version)'
-              exit $?
+          for attempt in $(seq 1 30); do
+            if curl --silent --show-error --fail --max-time 10 "https://omegaplus-auto-prediction-ai.onrender.com/api/prediction-calibration?from=$(date -u +%F)&to=$(date -u +%F)" -o /tmp/calibration.json; then
+              if node -e 'const fs=require("fs"); let d; try { d=JSON.parse(fs.readFileSync("/tmp/calibration.json","utf8")); } catch { process.exit(1); } if(!d.ok||!Array.isArray(d.reliabilityBins)||typeof d.sampleSize!=="number") process.exit(1); console.log("Calibration API is live; evaluated sample:",d.sampleSize)'; then
+                exit 0
+              fi
             fi
-            echo "Production is still deploying (attempt $attempt/18)"
+            echo "Waiting for new production version (attempt $attempt/30)"
             sleep 10
           done
-          echo "Production health endpoint did not become healthy in time."
+          echo "The calibration API did not become available in production."
           exit 1
-      - name: Verify diagnostics API responds
+      - name: Verify production health endpoint
+        run: |
+          curl --silent --show-error --fail --retry 5 --retry-delay 5 --retry-all-errors --max-time 20 "https://omegaplus-auto-prediction-ai.onrender.com/health" -o /tmp/health.json
+          node -e 'const fs=require("fs"),d=JSON.parse(fs.readFileSync("/tmp/health.json","utf8")); if(d.status!=="healthy"||d.service!=="omegaplus-auto-prediction-ai") process.exit(1); console.log("Production health endpoint is healthy:",d.version)'
+      - name: Verify diagnostics and database status
         run: |
           curl --silent --show-error --fail --retry 5 --retry-delay 5 --retry-all-errors --max-time 20 "https://omegaplus-auto-prediction-ai.onrender.com/api/health" -o /tmp/api-health.json
-          node -e 'const d=require("/tmp/api-health.json"); if(!d.ok||!d.service) process.exit(1); console.log("Diagnostics API:", d.status, "database:", d.dbReady?"ready":d.dbConfigured?"unavailable":"not configured"); if(d.status!=="healthy") console.warn("Production is degraded; inspect the diagnostics payload.")'
-      - name: Verify calibration endpoint responds
-        run: |
-          TODAY=$(date -u +%F)
-          curl --silent --show-error --fail --retry 5 --retry-delay 5 --retry-all-errors --max-time 20 "https://omegaplus-auto-prediction-ai.onrender.com/api/prediction-calibration?from=$TODAY&to=$TODAY" -o /tmp/calibration.json
-          node -e 'const d=require("/tmp/calibration.json"); if(!d.ok||!Array.isArray(d.reliabilityBins)||typeof d.sampleSize!=="number") process.exit(1); console.log("Calibration endpoint OK; evaluated sample:", d.sampleSize)'
+          node -e 'const fs=require("fs"),d=JSON.parse(fs.readFileSync("/tmp/api-health.json","utf8")); if(!d.ok||!d.service||!["healthy","degraded"].includes(d.status)||!d.database) process.exit(1); console.log("Diagnostics API:",d.status,"database:",d.dbReady?"ready":d.dbConfigured?"unavailable":"not configured"); if(d.status!=="healthy") console.warn("Production is degraded; inspect the diagnostics payload.")'
