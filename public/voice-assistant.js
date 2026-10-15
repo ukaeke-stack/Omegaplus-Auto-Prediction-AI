@@ -45,15 +45,33 @@ async function submitPrompt(options={}){
    if(home){showHomeReply(reply);addSpeakButton($("#assistantHomeReply"),reply)}
    return;
  }
+ let searchPrompt=prompt,excludeEventIds=[],previousSelections=[];
+ if(lastSelections.length&&lastRequest&&/\\b(look for more|find more|search more|add more|more games|more selections)\\b/i.test(prompt)){
+   const criteria=(lastRequest.criteria||[]).map(c=>c.type==="any"?"best games from any markets":c.label).filter(Boolean).join(" and ")||lastRequest.marketLabel;
+   const dates=(lastRequest.dateLabels||["Today"]).join(" and ").toLowerCase();
+   const remaining=Math.max(1,Number(lastRequest.requestedGames||20)-lastSelections.length);
+   searchPrompt="Find "+remaining+" football games for "+criteria+" "+dates+" for SportyBet";
+   excludeEventIds=lastSelections.map(x=>String(x.eventId));
+   previousSelections=lastSelections.slice();
+ }
  const btn=$("#assistantSubmit");if(btn)btn.disabled=true;
  if(home)showHomeStatus("Sending your request to Omegaplus AI…");else setStatus("Sending your request to Omegaplus AI…");
  const results=$("#assistantResults");if(results)results.innerHTML="";
  try{
-  const d=await api("/api/assistant/chat",{method:"POST",body:JSON.stringify({message:prompt,conversationId})});
+  const d=await api("/api/assistant/chat",{method:"POST",body:JSON.stringify({message:searchPrompt,conversationId,excludeEventIds})});
   conversationId=d.conversationId||conversationId;
   if(d.bookingPreview){
    openAssistantPage();
    const preview=d.bookingPreview;
+   if(previousSelections.length){
+     preview.selections=[...previousSelections,...(preview.selections||[])];
+     preview.request.requestedGames=lastRequest.requestedGames;
+     preview.request.marketLabel=lastRequest.marketLabel;
+     preview.request.dateLabels=lastRequest.dateLabels;
+     preview.request.criteria=lastRequest.criteria;
+     preview.warnings=preview.selections.length<preview.request.requestedGames?["Found "+preview.selections.length+" total selections so far; no filler games were added."]: [];
+     d.reply="Found "+preview.selections.length+" total qualified "+preview.request.marketLabel+" selections. Would you like the booking code or another market mix?";
+   }
    render({request:preview.request,selections:preview.selections||[],warnings:preview.warnings||[],message:d.reply});
    return;
   }
