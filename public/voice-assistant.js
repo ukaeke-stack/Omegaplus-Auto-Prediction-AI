@@ -21,10 +21,11 @@ function drawSlipImage(code){
 function render(d){
  lastRequest=d.request;lastSelections=d.selections||[];
  const box=$("#assistantResults");if(!box)return;
- box.innerHTML='<div class="assistant-result-summary"><b>'+lastSelections.length+' of '+esc(d.request.requestedGames)+' requested games selected</b><small>'+esc(d.request.dateLabels.join(", "))+' · '+esc(d.request.marketLabel)+' · '+esc(d.request.bookmaker)+'</small></div>'+
+ const items=lastSelections.map((s,i)=>'<article class="assistant-fixture"><span>'+String(i+1).padStart(2,"0")+'</span><div><b>'+esc(s.home)+' vs '+esc(s.away)+'</b><small>'+esc(s.league||"League unavailable")+' · '+esc(s.date)+' · '+esc(s.pick)+' · Odds '+esc(s.odds||"—")+'</small></div></article>').join("");
+ box.innerHTML='<div class="assistant-result-summary"><b>'+lastSelections.length+' qualified selections found</b><small>'+esc(d.request.marketLabel)+' · '+esc((d.request.dateLabels||[]).join(", "))+' · '+esc(d.request.bookmaker||"SportyBet")+'</small></div>'+
  (d.warnings||[]).map(w=>'<div class="analysis-status">'+esc(w)+'</div>').join("")+
- '<div class="assistant-fixtures">'+lastSelections.map((s,i)=>'<article class="assistant-fixture"><span>'+String(i+1).padStart(2,"0")+'</span><div><b>'+esc(s.home)+' vs '+esc(s.away)+'</b><small>'+esc(s.league||"League unavailable")+' · '+esc(s.date)+' · '+esc(s.pick)+' · Odds '+esc(s.odds||"—")+'</small></div></article>').join("")+'</div>'+
- '<div class="control-actions"><button class="primary" id="assistantGenerateCode" '+(lastSelections.length?"":"disabled")+'>Generate SportyBet booking code</button><button class="secondary" id="assistantImage">Save slip image</button></div><div class="analysis-status" id="assistantBookingStatus">Review the selected fixtures before generating a booking code.</div><div id="assistantBookingResult" hidden></div>';
+ (lastSelections.length?'<details class="assistant-fixtures-details"><summary>Review '+lastSelections.length+' selected fixtures</summary><div class="assistant-fixtures">'+items+'</div></details>':'')+
+ '<div class="control-actions"><button class="primary" id="assistantGenerateCode" '+(lastSelections.length?"":"disabled")+'>Generate booking code</button><button class="secondary" id="assistantImage" '+(lastSelections.length?"":"disabled")+'>Save slip image</button></div><div class="analysis-status" id="assistantBookingStatus">You can ask me to find more or add another market.</div><div id="assistantBookingResult" hidden></div>';
  $("#assistantImage").onclick=()=>drawSlipImage("");
  $("#assistantGenerateCode").onclick=generateCode;
  setStatus(d.message||"Selections ready for review.");
@@ -36,6 +37,14 @@ async function submitPrompt(options={}){
  const home=Boolean(options.home),input=$("#assistantPrompt"),prompt=String(options.prompt??input?.value??"").trim();
  if(!prompt){if(home)showHomeStatus("Type or say what you want help with.");else setStatus("Type or say what you want help with.");return}
  if(input&&options.prompt!==undefined)input.value=prompt;
+ if(lastSelections.length&&/\\b(generate|create|make|get)\\b.{0,35}\\b(booking\\s*code|code)\\b/i.test(prompt)){
+   if(home){showHomeStatus("Generating the booking code for the reviewed selections…");openAssistantPage()}
+   setStatus("Generating the booking code for the reviewed selections…");
+   await generateCode();
+   const reply="I’ve requested the booking code for the "+lastSelections.length+" reviewed selections.";
+   if(home){showHomeReply(reply);addSpeakButton($("#assistantHomeReply"),reply)}
+   return;
+ }
  const btn=$("#assistantSubmit");if(btn)btn.disabled=true;
  if(home)showHomeStatus("Sending your request to Omegaplus AI…");else setStatus("Sending your request to Omegaplus AI…");
  const results=$("#assistantResults");if(results)results.innerHTML="";
@@ -73,12 +82,25 @@ async function generateCode(){
 function voice(promptSelector="#assistantPrompt",buttonSelector="#assistantMic"){
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){setStatus("Voice input is not supported by this browser. You can type the request instead.");return}
- const rec=new SR();rec.lang="en-NG";rec.interimResults=false;rec.maxAlternatives=1;
+ const rec=new SR();rec.lang="en-NG";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;
  const b=$(buttonSelector);if(!b)return;b.disabled=true;b.textContent="Listening…";
- rec.onresult=e=>{const input=$(promptSelector),transcript=String(e.results?.[0]?.[0]?.transcript||"").trim();if(!input||!transcript){setStatus("I could not hear a clear request. Please try again or type it.");return}input.value=transcript;if(promptSelector==="#assistantPromptHome"){showHomeStatus("Voice captured. Sending your request to Omegaplus AI…");submitPrompt({prompt:transcript,home:true})}else{setStatus("Voice captured. Sending your request to Omegaplus AI…");submitPrompt({prompt:transcript})}};
- rec.onerror=e=>setStatus(e.error==="not-allowed"?"Microphone permission was denied. Allow microphone access or type your request.":"Voice input failed. You can type the request instead.");
- rec.onend=()=>{b.disabled=false;b.textContent="🎙 Speak";};
- try{rec.start()}catch(error){b.disabled=false;b.textContent="🎙 Speak";setStatus("Could not start microphone input. Check browser microphone permission and try again.");}
+ let transcript="",silenceTimer=null,submitted=false;
+ const finish=()=>{if(submitted)return;submitted=true;clearTimeout(silenceTimer);try{rec.stop()}catch{};const text=transcript.trim();if(!text){if(promptSelector==="#assistantPromptHome")showHomeStatus("I didn't catch a complete request. Please speak again or type it.");else setStatus("I didn't catch a complete request. Please speak again or type it.");return}
+ const input=$(promptSelector);if(input)input.value=text;
+ if(promptSelector==="#assistantPromptHome"){showHomeStatus("You’ve finished speaking. Processing your request…");submitPrompt({prompt:text,home:true})}
+ else{setStatus("You’ve finished speaking. Processing your request…");submitPrompt({prompt:text})}
+ };
+ rec.onresult=e=>{
+   let combined="";
+   for(let i=0;i<e.results.length;i++){const result=e.results[i];if(result&&result[0])combined+=result[0].transcript+" "}
+   transcript=combined.trim();
+   if(silenceTimer)clearTimeout(silenceTimer);
+   silenceTimer=setTimeout(finish,2200);
+ };
+ rec.onerror=e=>{clearTimeout(silenceTimer);if(e.error==="not-allowed")setStatus("Microphone permission was denied. Allow microphone access or type the request.");else setStatus("Voice input failed. You can type the request instead.");};
+ rec.onend=()=>{clearTimeout(silenceTimer);b.disabled=false;b.textContent="🎙 Speak";if(!submitted&&transcript.trim())finish()};
+ try{rec.start();if(promptSelector==="#assistantPromptHome")showHomeStatus("Listening. I’ll wait for about two seconds of silence before sending your request.");else setStatus("Listening. I’ll wait for about two seconds of silence before sending your request.");}
+ catch(error){b.disabled=false;b.textContent="🎙 Speak";setStatus("Could not start microphone input. Check browser microphone permission and try again.");}
 }
 function init(){
  const nav=document.querySelector(".side-nav");
