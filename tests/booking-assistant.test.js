@@ -18,7 +18,7 @@ test("supports BTTS Yes and BTTS No as separate exact options",()=>{
   assert.deepEqual(parseBookingAssistantPrompt("SportyBet 20 football games BTTS No today","2026-10-14").criteria,[{type:"btts",option:"No",label:"BTTS No"}]);
 });
 
-test("supports multiple requested markets without replacing them",()=>{
+test("supports best games across any market",()=>{\n  const request=parseBookingAssistantPrompt("SportyBet best 20 games from any options, markets or leagues today","2026-10-14");\n  assert.equal(request.requestedGames,20);\n  assert.equal(request.criteria[0].type,"any");\n});\n\ntest("supports multiple requested markets without replacing them",()=>{
   const request=parseBookingAssistantPrompt("SportyBet 20 football games BTTS Yes and Over 2.5 goals today","2026-10-14");
   assert.equal(request.criteria.length,2);
   assert.deepEqual(request.criteria.map(c=>c.type),["goals","btts"]);
