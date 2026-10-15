@@ -14,6 +14,7 @@ import {initSocialPublishingDb,publishDailyBestToSocials,getSocialPublishingStat
 import {parseBookingAssistantPrompt} from "./booking-assistant.js";
 import {chatForUser,listUserConversations,getUserConversation,saveAssistantExchange} from "./ai-chat.js";
 import {smartPickRank,buildBetBuilder,performanceFromArchives,buildMatchReport,oddsMovement,extractOddsSnapshot} from "./advanced-features.js";
+import {summarizePredictionCalibration} from "./prediction-calibration.js";
 import path from "node:path";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
@@ -639,7 +640,7 @@ app.get("/api/admin/release-check",requireRole("admin"),async(req,r)=>{
 });
 app.get("/api/sports",(_,r)=>r.json({ok:true,sports:SPORTS}));
 app.get("/health",(_,r)=>r.status(200).json({status:"healthy",service:"omegaplus-auto-prediction-ai",version:APP_VERSION,uptime:Math.round(process.uptime())}));
-app.get("/api/health",async(_,r)=>{const stats=await independentHealth(),configured=authDbConfigured(),ready=await dbReady();r.json({ok:true,service:"Omegaplus Auto Prediction AI",version:APP_VERSION,branch:"main",liveSportyBet:true,dbConfigured:configured,dbReady:ready,accountSystem:{configured,ready},independentStats:stats,multiBookmaker:BOOKMAKERS.map(x=>({id:x.id,name:x.name,codeGeneration:x.id==="sportybet"||Boolean(BETRELAY_API_KEY)}))})});
+app.get("/api/health",async(_,r)=>{try{const stats=await independentHealth(),configured=authDbConfigured(),ready=await dbReady(),issues=[];if(!configured)issues.push("database_not_configured");else if(!ready)issues.push("database_unavailable");const branch=process.env.RENDER_GIT_BRANCH||process.env.GITHUB_REF_NAME||"unknown";r.json({ok:true,status:issues.length?"degraded":"healthy",service:"Omegaplus Auto Prediction AI",version:APP_VERSION,branch,checkedAt:new Date().toISOString(),liveSportyBet:null,sportyBetConfigured:Boolean(SPORTYBET_BASE),dbConfigured:configured,dbReady:ready,accountSystem:{configured,ready},database:{configured,ready},providers:{sportybet:{configured:Boolean(SPORTYBET_BASE),checked:false},sofascore:{available:Boolean(stats.sofascore)},understat:{available:Boolean(stats.understat)}},issues,independentStats:stats,multiBookmaker:BOOKMAKERS.map(x=>({id:x.id,name:x.name,codeGeneration:x.id==="sportybet"||Boolean(BETRELAY_API_KEY)}))})}catch(error){r.status(200).json({ok:true,status:"degraded",service:"Omegaplus Auto Prediction AI",version:APP_VERSION,checkedAt:new Date().toISOString(),issues:["health_check_partial_failure"],error:"Some health checks could not complete."})}});
 app.get("/api/auth/me",async(req,r)=>{try{const user=await currentUser(req);r.json({ok:Boolean(user),user:user||null})}catch{r.json({ok:false,user:null})}});
 app.post("/api/auth/register",async(req,r)=>{try{if(!(await getAdminSettings()).registrationEnabled)return r.status(403).json({ok:false,error:"New registration is currently disabled by the administrator."});const user=await registerUser(req.body||{},req);const session=await (await import("./auth.js")).createSession(user,req);setSessionCookie(r,session.token);r.status(201).json({ok:true,user})}catch(e){r.status(400).json({ok:false,error:e.message})}});
 app.post("/api/auth/login",async(req,r)=>{try{const x=await loginUser(req.body||{},req);setSessionCookie(r,x.session.token);r.json({ok:true,user:x.user})}catch(e){r.status(401).json({ok:false,error:e.message})}});
@@ -1815,6 +1816,38 @@ app.get("/api/smart-picks",async(req,res)=>{
 app.post("/api/bet-builder",requirePaid,async(req,res)=>{
  try{const rows=Array.isArray(req.body?.predictions)?req.body.predictions:[];const mode=String(req.body?.mode||"conservative");res.json({ok:true,mode,predictions:buildBetBuilder(rows,mode)})}
  catch(e){res.status(400).json({ok:false,error:e.message,predictions:[]})}
+});
+app.get("/api/prediction-calibration",async(req,res)=>{
+ try{
+   const today=localDayKey(Date.now());
+   const to=String(req.query.to||today),from=String(req.query.from||localDayKey(Date.now()-29*86400000));
+   const sport=String(req.query.sport||"football");
+   const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value+"T00:00:00Z"))&&new Date(value+"T00:00:00Z").toISOString().slice(0,10)===value;
+   if(!validDate(from)||!validDate(to)||from>to)return res.status(400).json({ok:false,error:"Use valid from/to dates in YYYY-MM-DD format, with from no later than to."});
+   if(!["football","basketball","baseball","ice_hockey","tennis","table_tennis"].includes(sport))return res.status(400).json({ok:false,error:"Unsupported sport."});
+   const days=Math.round((Date.parse(to+"T00:00:00Z")-Date.parse(from+"T00:00:00Z"))/86400000)+1;
+   if(days>90)return res.status(400).json({ok:false,error:"Calibration reports are limited to 90 days per request."});
+   const dates=Array.from({length:days},(_,i)=>new Date(Date.parse(from+"T00:00:00Z")+i*86400000).toISOString().slice(0,10));
+   const archives=[];
+   for(let i=0;i<dates.length;i+=6){
+     const batch=await Promise.all(dates.slice(i,i+6).map(async date=>({date,archive:await readPersistentArchive(date,sport)})));
+     archives.push(...batch);
+   }
+   const rows=[],seen=new Set();
+   for(const {date,archive} of archives){
+     const candidates=[...(Array.isArray(archive?.predictions)?archive.predictions:[]),...(Array.isArray(archive?.dailyBestPredictions)?archive.dailyBestPredictions:[])];
+     for(const row of candidates){
+       if(!row||typeof row!=="object")continue;
+       const identity=[row.id,row.eventId,row.marketType||row.market,row.pick||row.selection,row.home,row.away].filter(value=>value!==undefined&&value!==null&&String(value)!=="").join("|")||date;
+       const key=date+"|"+identity;
+       if(seen.has(key))continue;
+       seen.add(key);rows.push({...row,archiveDate:date});
+     }
+   }
+   res.json({ok:true,from,to,sport,archiveDaysChecked:archives.length,archivesRead:archives.filter(item=>item.archive).length,sourcePredictionCount:rows.length,...summarizePredictionCalibration(rows)});
+ }catch(error){
+   res.status(503).json({ok:false,error:"Prediction calibration data is temporarily unavailable."});
+ }
 });
 app.get("/api/performance-advanced",async(req,res)=>{
  try{const today=localDayKey(Date.now()),from=String(req.query.from||today),to=String(req.query.to||from);res.json({ok:true,from,to,...await performanceFromArchives(d=>readPersistentArchive(d),from,to)})}
