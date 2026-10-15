@@ -1542,11 +1542,9 @@ async function selectAssistantFixtures(request){
     const previous=unique.get(key);
     if(!previous||row.confidence>previous.confidence)unique.set(key,row);
   }
-  const mixed=(request.criteria||[]).length>1||(request.criteria||[]).some(c=>c.type==="any");
   const ranked=[...unique.values()].sort((a,b)=>b.confidence-a.confidence||a.startTimeMs-b.startTimeMs);
-  if(mixed)return ranked.slice(0,request.requestedGames);
   const seen=new Set();
-  return ranked.filter(row=>{if(seen.has(row.eventId))return false;seen.add(row.eventId);return true}).slice(0,request.requestedGames);
+  return ranked.filter(row=>{const key=row.eventId+"|"+row.date;if(seen.has(key))return false;seen.add(key);return true}).slice(0,request.requestedGames);
 }
 app.get("/api/assistant/conversations",requireAuth,async(req,res)=>{
   try{res.json({ok:true,conversations:await listUserConversations(req.user.id)});}
@@ -1622,7 +1620,7 @@ function isBookingCodeIntent(message){
 function normalizedBookingPrompt(message){
   let prompt=String(message||"").trim();
   if(!/sportybet/i.test(prompt))prompt+=" for SportyBet";
-  if(!/football|soccer/i.test(prompt))prompt+=" football";
+  if(!/football|soccer|basketball|tennis|table tennis|ice hockey|baseball/i.test(prompt))prompt+=" football";
   return prompt;
 }
 app.post("/api/assistant/chat",requireAuth,async(req,res)=>{
