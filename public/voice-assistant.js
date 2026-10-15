@@ -107,26 +107,19 @@ async function voice(promptSelector="#assistantPrompt",buttonSelector="#assistan
  await loadAssistantConfig();
  if(!assistantConfig.assistantEnabled||!assistantConfig.voiceInputEnabled){const msg="Voice input is temporarily disabled by the administrator.";if(promptSelector==="#assistantPromptHome")showHomeStatus(msg);else setStatus(msg);return}
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(!SR){setStatus("Voice input is not supported by this browser. You can type the request instead.");return}
- const rec=new SR();rec.lang="en-NG";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;
- const b=$(buttonSelector);if(!b)return;b.disabled=true;b.textContent="Listening…";
- let transcript="",silenceTimer=null,submitted=false;
- const finish=()=>{if(submitted)return;submitted=true;clearTimeout(silenceTimer);try{rec.stop()}catch{};const text=transcript.trim();if(!text){if(promptSelector==="#assistantPromptHome")showHomeStatus("I didn't catch a complete request. Please speak again or type it.");else setStatus("I didn't catch a complete request. Please speak again or type it.");return}
+ if(!SR){const msg="Voice input is not supported by this Android WebView. Type the request instead.";if(promptSelector==="#assistantPromptHome")showHomeStatus(msg);else setStatus(msg);return}
+ const b=$(buttonSelector);if(!b)return;
+ const rec=new SR();rec.lang="en-NG";rec.continuous=false;rec.interimResults=true;rec.maxAlternatives=1;b.disabled=true;b.textContent="Listening…";
+ let finalTranscript="",interimTranscript="",silenceTimer=null,submitted=false,finished=false;
+ const restore=()=>{clearTimeout(silenceTimer);b.disabled=false;b.textContent="🎙 Speak"};
+ const finish=()=>{if(submitted)return;submitted=true;finished=true;clearTimeout(silenceTimer);try{rec.stop()}catch{};const text=(finalTranscript+" "+interimTranscript).trim();restore();if(!text){const msg="I didn't catch a complete request. Please speak again or type it.";if(promptSelector==="#assistantPromptHome")showHomeStatus(msg);else setStatus(msg);return}
  const input=$(promptSelector);if(input)input.value=text;
- if(promptSelector==="#assistantPromptHome"){showHomeStatus("You’ve finished speaking. Processing your request…");submitPrompt({prompt:text,home:true})}
- else{setStatus("You’ve finished speaking. Processing your request…");submitPrompt({prompt:text})}
+ if(promptSelector==="#assistantPromptHome"){showHomeStatus("You’ve finished speaking. Processing your request…");submitPrompt({prompt:text,home:true})}else{setStatus("You’ve finished speaking. Processing your request…");submitPrompt({prompt:text})}
  };
- rec.onresult=e=>{
-   let combined="";
-   for(let i=0;i<e.results.length;i++){const result=e.results[i];if(result&&result[0])combined+=result[0].transcript+" "}
-   transcript=combined.trim();
-   if(silenceTimer)clearTimeout(silenceTimer);
-   silenceTimer=setTimeout(finish,2200);
- };
- rec.onerror=e=>{clearTimeout(silenceTimer);if(e.error==="not-allowed")setStatus("Microphone permission was denied. Allow microphone access or type the request.");else setStatus("Voice input failed. You can type the request instead.");};
- rec.onend=()=>{clearTimeout(silenceTimer);b.disabled=false;b.textContent="🎙 Speak";if(!submitted&&transcript.trim())finish()};
- try{rec.start();if(promptSelector==="#assistantPromptHome")showHomeStatus("Listening. I’ll wait for about two seconds of silence before sending your request.");else setStatus("Listening. I’ll wait for about two seconds of silence before sending your request.");}
- catch(error){b.disabled=false;b.textContent="🎙 Speak";setStatus("Could not start microphone input. Check browser microphone permission and try again.");}
+ rec.onresult=e=>{interimTranscript="";for(let i=e.resultIndex;i<e.results.length;i++){const result=e.results[i];if(!result||!result[0])continue;if(result.isFinal){finalTranscript+=(finalTranscript?" ":"")+result[0].transcript.trim();interimTranscript=""}else interimTranscript=result[0].transcript.trim()}clearTimeout(silenceTimer);silenceTimer=setTimeout(finish,1800)};
+ rec.onerror=e=>{finished=true;clearTimeout(silenceTimer);restore();const msg=e.error==="not-allowed"||e.error==="service-not-allowed"?"Microphone access was denied. Allow microphone permission in Android Settings, then try again.":"Voice input failed ("+e.error+"). You can type the request instead.";if(promptSelector==="#assistantPromptHome")showHomeStatus(msg);else setStatus(msg)};
+ rec.onend=()=>{restore();if(!submitted&&!finished&&(finalTranscript||interimTranscript).trim())finish();else if(!submitted&&!finished){const msg="Listening stopped. Tap Speak to try again.";if(promptSelector==="#assistantPromptHome")showHomeStatus(msg);else setStatus(msg)}};
+ try{rec.start();const msg="Listening. Speak once, then pause briefly to send your request.";if(promptSelector==="#assistantPromptHome")showHomeStatus(msg);else setStatus(msg)}catch{finished=true;restore();const msg="Could not start microphone input. Check Android app microphone permission and try again.";if(promptSelector==="#assistantPromptHome")showHomeStatus(msg);else setStatus(msg)}
 }
 function init(){
  loadAssistantConfig();
