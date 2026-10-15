@@ -1486,7 +1486,7 @@ function assistantMarketMatches(market,criterion){
   if(criterion.type==="corners")return /corner/.test(name)&&/over.?under|total/.test(name);
   if(criterion.type==="cards")return /card|booking/.test(name)&&/over.?under|total/.test(name);
   if(criterion.type==="btts")return /both teams|btts/.test(name);
-  if(criterion.type==="1x2")return /(^|\\b)1x2(\\b|$)|match result|full.?time result|winner/.test(name)&&!/double chance|draw no bet/.test(name);
+  if(criterion.type==="1x2")return /(^|\b)1x2(\b|$)|match result|full.?time result|winner/.test(name)&&!/double chance|draw no bet/.test(name);
   if(criterion.type==="double_chance")return /double chance/.test(name);
   if(criterion.type==="dnb")return /draw no bet/.test(name);
   return false;
@@ -1498,20 +1498,20 @@ function assistantOutcomeMatches(market,outcome,criterion){
     const dir=criterion.direction;
     if(!new RegExp("\\b"+dir+"\\b","i").test(pick))return false;
     const spec=String(market.specifier||"");
-    const lineFromSpec=spec.match(/(?:total|goals?|corners?|cards?|line)\\s*[=:]\\s*(\\d+(?:\\.\\d+)?)/i);
-    const lineFromPick=pick.match(/\\b(?:over|under)\\s*(\\d+(?:\\.\\d+)?)/i);
-    const anyLine=spec.match(/\\d+(?:\\.\\d+)?/);
+    const lineFromSpec=spec.match(/(?:total|goals?|corners?|cards?|line)\s*[=:]\s*(\d+(?:\.\d+)?)/i);
+    const lineFromPick=pick.match(/\b(?:over|under)\s*(\d+(?:\.\d+)?)/i);
+    const anyLine=spec.match(/\d+(?:\.\d+)?/);
     const line=Number(lineFromSpec?.[1]||lineFromPick?.[1]||anyLine?.[0]||NaN);
     return Number.isFinite(line)&&Math.abs(line-criterion.line)<0.001;
   }
   if(criterion.type==="btts")return criterion.option==="Yes"?/^(yes|btts yes|both teams to score yes)$/.test(pick):/^(no|btts no|both teams to score no)$/.test(pick);
   if(criterion.type==="1x2"){
     if(criterion.option==="Home")return /^(home|home win|1|1x2 home)$/.test(pick)||/home/.test(pick);
-    if(criterion.option==="Draw")return /^(draw|tie|x|1x2 draw)$/.test(pick)||/\\bdraw\\b/.test(pick);
+    if(criterion.option==="Draw")return /^(draw|tie|x|1x2 draw)$/.test(pick)||/\bdraw\b/.test(pick);
     return /^(away|away win|2|1x2 away)$/.test(pick)||/away/.test(pick);
   }
   if(criterion.type==="double_chance"){
-    const normalized=pick.replace(/\\s+/g,"").replace(/homeordraw|homedraw/g,"1x").replace(/draworaway|drawaway/g,"x2").replace(/homeoraway/g,"12");
+    const normalized=pick.replace(/\s+/g,"").replace(/homeordraw|homedraw/g,"1x").replace(/draworaway|drawaway/g,"x2").replace(/homeoraway/g,"12");
     return normalized===criterion.option.toLowerCase()||normalized.includes(criterion.option.toLowerCase());
   }
   if(criterion.type==="dnb")return criterion.option==="Home"?/^(home|home win|1)$/.test(pick)||/home/.test(pick):/^(away|away win|2)$/.test(pick)||/away/.test(pick);
