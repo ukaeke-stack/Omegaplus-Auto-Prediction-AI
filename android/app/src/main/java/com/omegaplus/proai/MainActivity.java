@@ -33,8 +33,8 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> pendingFileChooser;
     private PermissionRequest pendingWebPermission;
     private TextToSpeech textToSpeech;
-    private boolean ttsReady=false;
-    private boolean ttsInitializationComplete=false;
+    private volatile boolean ttsReady=false;
+    private volatile boolean ttsInitializationComplete=false;
     private String pendingSpeechText="";
     private String pendingSpeechSource="default";
     private String currentSpeechText="";
