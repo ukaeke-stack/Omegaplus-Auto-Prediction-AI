@@ -9,6 +9,10 @@ on:
       - "prediction-calibration.js"
       - "public/index.html"
       - "public/intelligence.js"
+      - "public/voice-assistant.js"
+      - "public/ai-chat.js"
+      - "android/**"
+      - "test/**"
       - ".github/workflows/production-smoke.yml"
 
 permissions:
@@ -40,3 +44,22 @@ jobs:
         run: |
           curl --silent --show-error --fail --retry 5 --retry-delay 5 --retry-all-errors --max-time 20 "https://omegaplus-auto-prediction-ai.onrender.com/api/health" -o /tmp/api-health.json
           node -e 'const fs=require("fs"),d=JSON.parse(fs.readFileSync("/tmp/api-health.json","utf8")); if(!d.ok||!d.service||!["healthy","degraded"].includes(d.status)||!d.database) process.exit(1); console.log("Diagnostics API:",d.status,"database:",d.dbReady?"ready":d.dbConfigured?"unavailable":"not configured"); if(d.status!=="healthy") console.warn("Production is degraded; inspect the diagnostics payload.")'
+
+      - name: Verify updated frontend assets and cache versions
+        run: |
+          curl --silent --show-error --fail --retry 5 --retry-delay 5 --retry-all-errors --max-time 20 "https://omegaplus-auto-prediction-ai.onrender.com/" -o /tmp/index.html
+          grep -q 'voice-assistant.js?v=1.0.7' /tmp/index.html
+          grep -q 'ai-chat.js?v=1.1.3' /tmp/index.html
+          curl --silent --show-error --fail --max-time 20 "https://omegaplus-auto-prediction-ai.onrender.com/voice-assistant.js?v=1.0.7" -o /tmp/voice-assistant.js
+          curl --silent --show-error --fail --max-time 20 "https://omegaplus-auto-prediction-ai.onrender.com/ai-chat.js?v=1.1.3" -o /tmp/ai-chat.js
+          grep -q 'omega-native-speech-fallback' /tmp/voice-assistant.js
+          grep -q 'omega-native-speech-fallback' /tmp/ai-chat.js
+          echo "Updated voice and AI chat assets are served."
+      - name: Verify private assistant API requires login
+        run: |
+          CODE=$(curl --silent --show-error --max-time 20 -o /tmp/auth-check.json -w '%{http_code}' -X POST "https://omegaplus-auto-prediction-ai.onrender.com/api/assistant/chat" -H 'content-type: application/json' --data '{"message":"production smoke check"}')
+          node -e 'const fs=require("fs"),d=JSON.parse(fs.readFileSync("/tmp/auth-check.json","utf8")); if(process.env.STATUS!=="401"||d.ok!==false||d.code!=="AUTH_REQUIRED") process.exit(1); console.log("Private assistant API correctly requires authentication.")' STATUS="$CODE"
+      - name: Verify calibration validation rejects invalid inputs
+        run: |
+          CODE=$(curl --silent --show-error --max-time 20 -o /tmp/invalid-date.json -w '%{http_code}' "https://omegaplus-auto-prediction-ai.onrender.com/api/prediction-calibration?from=2026-02-30&to=2026-02-30")
+          node -e 'const fs=require("fs"),d=JSON.parse(fs.readFileSync("/tmp/invalid-date.json","utf8")); if(process.env.STATUS!=="400"||d.ok!==false) process.exit(1); console.log("Invalid calendar dates are rejected.")' STATUS="$CODE"
