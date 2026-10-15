@@ -72,7 +72,7 @@ public class MainActivity extends Activity {
 
     private void dispatchSpeechFallback(String value,String source){
         if(webView==null||value==null||value.trim().isEmpty())return;
-        String detail="{\\"text\\":"+JSONObject.quote(value)+",\\"source\\":"+JSONObject.quote(source==null?"default":source)+"}";
+        String detail="{\"text\":"+JSONObject.quote(value)+",\"source\":"+JSONObject.quote(source==null?"default":source)+"}";
         webView.post(()->webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('omega-native-speech-fallback',{detail:"+detail+"}));",null));
     }
 
