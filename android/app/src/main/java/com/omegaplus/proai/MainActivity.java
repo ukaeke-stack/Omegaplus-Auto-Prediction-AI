@@ -40,13 +40,20 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void openPlayStore(){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id="+getPackageName())));}catch(Exception e){startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/apps/details?id="+getPackageName())));}}
         @JavascriptInterface public void speakText(String text){
             final String value=text==null?"":text.trim();if(value.isEmpty())return;
-            runOnUiThread(()->{if(textToSpeech==null||!ttsReady)return;textToSpeech.setLanguage(Locale.UK);
-                if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP)textToSpeech.speak(value,TextToSpeech.QUEUE_FLUSH,null,"omega-ai-reply");
-                else textToSpeech.speak(value,TextToSpeech.QUEUE_FLUSH,null);
+            runOnUiThread(()->{
+                if(textToSpeech==null||!ttsReady){pendingSpeechText=value;return;}
+                speakNow(value);
             });
         }
         @JavascriptInterface public void requestNotificationPermission(){runOnUiThread(()->{if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},4103);});}
         @JavascriptInterface public void showNotification(String title,String body){runOnUiThread(()->showNativeNotification(title,body));}
+    }
+
+    private void speakNow(String value){
+        if(textToSpeech==null||!ttsReady||value==null||value.trim().isEmpty())return;
+        textToSpeech.setLanguage(Locale.UK);
+        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP)textToSpeech.speak(value,TextToSpeech.QUEUE_FLUSH,null,"omega-ai-reply");
+        else textToSpeech.speak(value,TextToSpeech.QUEUE_FLUSH,null);
     }
 
     private void showNativeNotification(String title,String body){
@@ -61,7 +68,15 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
-        textToSpeech=new TextToSpeech(this,status->{ttsReady=status==TextToSpeech.SUCCESS;if(ttsReady)textToSpeech.setLanguage(Locale.UK);});
+        textToSpeech=new TextToSpeech(this,status->{
+            ttsReady=status==TextToSpeech.SUCCESS;
+            if(ttsReady){
+                textToSpeech.setLanguage(Locale.UK);
+                String queued=pendingSpeechText;
+                pendingSpeechText="";
+                if(!queued.isEmpty())speakNow(queued);
+            }
+        });
         webView=new WebView(this);webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new WebChromeClient(){
             @Override public void onPermissionRequest(PermissionRequest request){runOnUiThread(()->{
