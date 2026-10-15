@@ -357,3 +357,120 @@ button:disabled{opacity:.5}
  #page-home .home-side-column{grid-row:2}
  #page-home .home-side-column .assistant-home-launch{padding:15px}
 }
+
+
+/* Fixture Analyzer readability: use the full content width for the complete analysis-to-booking workflow. */
+#page-home .home-workspace-grid{
+  grid-template-columns:minmax(0,1fr)!important;
+  gap:18px;
+}
+#page-home .home-primary-column,
+#page-home .home-primary-column>.today-picks{
+  width:100%;max-width:none;min-width:0;
+}
+#page-home .today-picks{
+  padding:clamp(16px,2.2vw,30px);
+}
+#page-home .today-picks .section-head{
+  align-items:flex-start;
+}
+#page-home .today-picks .section-head>div{
+  min-width:0;max-width:100%;
+}
+#page-home .today-picks .section-head p{
+  max-width:900px;
+}
+#page-home .today-picks .analysis-controls{
+  width:100%;max-width:none;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:14px;
+}
+#page-home .today-picks .analysis-controls .control-card{
+  min-width:0;width:100%;padding:17px;
+}
+#page-home .today-picks .analysis-controls .control-card select,
+#page-home .today-picks .analysis-controls .control-card input{
+  display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;
+  font-size:14px;
+}
+#page-home .today-picks .analysis-controls .control-card select[multiple]{
+  padding:9px;line-height:1.5;
+}
+#page-home .today-picks .analysis-controls .control-card select[multiple] option{
+  padding:5px 4px;white-space:normal;
+}
+#page-home .today-picks .analysis-controls .control-card:has(#league){
+  grid-column:1/-1;
+}
+#page-home .today-picks .analysis-controls .control-card:has(#marketOptions),
+#page-home .today-picks .analysis-controls .control-card:has(#selectionOptions){
+  grid-column:span 2;
+}
+#page-home .today-picks .analysis-controls .date-card{
+  grid-column:span 2;
+}
+#page-home .today-picks .analysis-controls .control-card:has(#gameLimit){
+  grid-column:span 1;
+}
+#page-home .today-picks .analysis-controls .control-card small{
+  display:block;line-height:1.5;margin-top:8px;font-size:12px;
+}
+#page-home .today-picks .date-row{
+  display:grid;grid-template-columns:42px minmax(0,1fr) 42px auto;gap:8px;align-items:center;
+}
+#page-home .today-picks .date-row input{min-width:0;width:100%}
+#page-home .today-picks .control-actions,
+#page-home .today-picks .analysis-status,
+#page-home .today-picks #matches,
+#page-home .today-picks .slip-card{
+  width:100%;max-width:none;min-width:0;
+}
+#page-home .today-picks #matches{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;
+}
+#page-home .today-picks #matches:empty{display:block}
+#page-home .today-picks #matches>.match,
+#page-home .today-picks #matches>.calendar-game{
+  width:100%;min-width:0;max-width:none;margin:0;
+}
+#page-home .today-picks .slip-card{
+  padding:clamp(16px,2vw,26px);margin-top:16px;
+}
+#page-home .today-picks .slip-card select,
+#page-home .today-picks .slip-card input{
+  width:100%;max-width:100%;min-width:0;box-sizing:border-box;
+}
+#page-home .today-picks #booking,
+#page-home .today-picks #sporty,
+#page-home .today-picks #bookingResult{
+  width:100%;max-width:none;
+}
+#page-home .home-side-column{
+  width:100%;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;
+}
+#page-home .home-side-column>*{min-width:0;width:100%;max-width:none}
+@media(max-width:1000px){
+  #page-home .today-picks .analysis-controls{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #page-home .today-picks .analysis-controls .date-card,
+  #page-home .today-picks .analysis-controls .control-card:has(#marketOptions),
+  #page-home .today-picks .analysis-controls .control-card:has(#selectionOptions){grid-column:span 1}
+  #page-home .today-picks .analysis-controls .control-card:has(#league){grid-column:1/-1}
+  #page-home .today-picks #matches{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:760px){
+  #page-home .home-workspace-grid{grid-template-columns:minmax(0,1fr)!important;gap:14px}
+  #page-home .today-picks{padding:14px}
+  #page-home .today-picks .analysis-controls{grid-template-columns:minmax(0,1fr);gap:10px}
+  #page-home .today-picks .analysis-controls .control-card,
+  #page-home .today-picks .analysis-controls .date-card,
+  #page-home .today-picks .analysis-controls .control-card:has(#league),
+  #page-home .today-picks .analysis-controls .control-card:has(#marketOptions),
+  #page-home .today-picks .analysis-controls .control-card:has(#selectionOptions),
+  #page-home .today-picks .analysis-controls .control-card:has(#gameLimit){grid-column:1/-1}
+  #page-home .today-picks .date-row{grid-template-columns:34px minmax(0,1fr) 34px auto;gap:5px}
+  #page-home .today-picks .date-row button{min-width:0;padding:8px 7px}
+  #page-home .today-picks .analysis-controls .control-card select[multiple]{font-size:14px}
+  #page-home .today-picks #matches{grid-template-columns:minmax(0,1fr)}
+  #page-home .home-side-column{grid-template-columns:minmax(0,1fr)}
+  #page-home .today-picks .slip-card{padding:14px}
+}
