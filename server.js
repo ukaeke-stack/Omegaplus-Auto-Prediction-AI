@@ -1445,9 +1445,25 @@ app.post("/api/snap-predict/analyze-image",requirePaid,async(req,r)=>{
         const market=(fixture.markets||[]).find(m=>String(m.marketId||m.id||"")===String(p.marketId||"")&&String(m.specifier||"")===String(p.specifier||""));
         return market&&isDirectWinningMarket(market)&&["draw","x"].includes(snapNormalizeText(p.pick));
       });
-      const selectionHint=/\baway win\b|\baway\b|\b2\s*x\s*2\b/.test(ocr) ? directAway : /\bdraw\b/.test(ocr) ? directDraw : /\bhome win\b|\bhome\b|direct winning|1x2|match winner/.test(ocr) ? directHome : null;
+      const homeIndex=ocr.indexOf(home),awayIndex=ocr.indexOf(away);
+      const left=Math.max(0,Math.min(homeIndex,awayIndex)-90);
+      const right=Math.min(ocr.length,Math.max(homeIndex+home.length,awayIndex+away.length)+120);
+      const localContext=ocr.slice(left,right);
+      const goalLine=localContext.match(/\b(over|under)\s*(0\s*5|1\s*5|2\s*5|3\s*5|4\s*5)\b/);
+      const exactMarketPick=goalLine?picks.find(p=>{
+        const marketName=snapNormalizeText(p.market),pickName=snapNormalizeText(p.pick);
+        const digits=goalLine[2].replace(/\s/g,"");
+        const line=digits.slice(0,1)+" "+digits.slice(1);
+        return (marketName.includes("total")||marketName.includes("over under")||String(p.marketId)==="18")&&pickName.includes(goalLine[1]+" "+line);
+      }):null;
+      const bttsHint=/\bboth teams to score\b|\bbtts\b/.test(localContext);
+      const bttsPick=bttsHint?picks.find(p=>/both teams to score|btts/.test(snapNormalizeText(p.market))&&snapNormalizeText(localContext).includes(snapNormalizeText(p.pick))):null;
+      const selectionHint=exactMarketPick||bttsPick||
+        (/\baway win\b|\baway\b|\b2\s*x\s*2\b/.test(localContext)?directAway:
+         /\bdraw\b/.test(localContext)?directDraw:
+         /\bhome win\b|\bhome\b|direct winning|1x2|match winner/.test(localContext)?directHome:null);
       const selected=selectionHint||picks[0];
-      matches.push({...selected,marketOptions:picks.slice(0,8),selectedMarketId:selected.marketId,selectedSpecifier:selected.specifier||"",selectedOutcomeId:selected.outcomeId,matchConfidence:100,matchMethod:"Exact team-name match"});
+      matches.push({...selected,selectionType:selectionHint?"original":"recommendation",marketOptions:picks.slice(0,8),selectedMarketId:selected.marketId,selectedSpecifier:selected.specifier||"",selectedOutcomeId:selected.outcomeId,matchConfidence:100,matchMethod:"Exact team-name match"});
     }
     if(!matches.length)return r.json({ok:true,total:0,matches:[],ocrText:text,message:"The screenshot text was read, but no fixture with both recognizable team names matched the current SportyBet feed. Try a clearer image showing the full team names."});
     r.json({ok:true,total:matches.length,matches:matches.slice(0,30),source:"SportyBet live markets",probabilityNote:"The displayed chance is an odds-implied estimate for the identified selection (for example, Home win), not a guarantee or independently verified win probability."});
