@@ -349,7 +349,17 @@ export async function getAdminSettings(){
     correctScoreEnabled: out.correct_score_enabled!==false,
     bookingCodeEnabled: out.booking_code_enabled!==false,
     maxAnalyzerGames: Math.max(1,Math.min(50,Number(out.max_analyzer_games)||50)),
-    minAnalyzerConfidence: Math.max(0,Math.min(99,Number(out.min_analyzer_confidence)||0))
+    minAnalyzerConfidence: Math.max(0,Math.min(99,Number(out.min_analyzer_confidence)||0)),
+    assistantEnabled: out.assistant_enabled!==false,
+    voiceInputEnabled: out.voice_input_enabled!==false,
+    voiceRepliesEnabled: out.voice_replies_enabled!==false,
+    announcementEnabled: out.announcement_enabled===true,
+    announcementTitle: String(out.announcement_title||"").slice(0,120),
+    announcementMessage: String(out.announcement_message||"").slice(0,2000),
+    announcementType: ["info","success","warning","critical"].includes(out.announcement_type)?out.announcement_type:"info",
+    notificationsEnabled: out.notifications_enabled!==false,
+    browserNotificationsEnabled: out.browser_notifications_enabled===true,
+    maintenanceMessage: String(out.maintenance_message||"").slice(0,500)
   };
 }
 export async function updateAdminSettings(body={}){
@@ -362,13 +372,28 @@ export async function updateAdminSettings(body={}){
     correctScoreEnabled: typeof body.correctScoreEnabled==="boolean"?body.correctScoreEnabled:current.correctScoreEnabled,
     bookingCodeEnabled: typeof body.bookingCodeEnabled==="boolean"?body.bookingCodeEnabled:current.bookingCodeEnabled,
     maxAnalyzerGames: body.maxAnalyzerGames===undefined?current.maxAnalyzerGames:Math.max(1,Math.min(50,Math.round(Number(body.maxAnalyzerGames)||50))),
-    minAnalyzerConfidence: body.minAnalyzerConfidence===undefined?current.minAnalyzerConfidence:Math.max(0,Math.min(99,Math.round(Number(body.minAnalyzerConfidence)||0)))
+    minAnalyzerConfidence: body.minAnalyzerConfidence===undefined?current.minAnalyzerConfidence:Math.max(0,Math.min(99,Math.round(Number(body.minAnalyzerConfidence)||0))),
+    assistantEnabled: typeof body.assistantEnabled==="boolean"?body.assistantEnabled:current.assistantEnabled,
+    voiceInputEnabled: typeof body.voiceInputEnabled==="boolean"?body.voiceInputEnabled:current.voiceInputEnabled,
+    voiceRepliesEnabled: typeof body.voiceRepliesEnabled==="boolean"?body.voiceRepliesEnabled:current.voiceRepliesEnabled,
+    announcementEnabled: typeof body.announcementEnabled==="boolean"?body.announcementEnabled:current.announcementEnabled,
+    announcementTitle: body.announcementTitle===undefined?current.announcementTitle:String(body.announcementTitle||"").trim().slice(0,120),
+    announcementMessage: body.announcementMessage===undefined?current.announcementMessage:String(body.announcementMessage||"").trim().slice(0,2000),
+    announcementType: body.announcementType===undefined?current.announcementType:(["info","success","warning","critical"].includes(body.announcementType)?body.announcementType:"info"),
+    notificationsEnabled: typeof body.notificationsEnabled==="boolean"?body.notificationsEnabled:current.notificationsEnabled,
+    browserNotificationsEnabled: typeof body.browserNotificationsEnabled==="boolean"?body.browserNotificationsEnabled:current.browserNotificationsEnabled,
+    maintenanceMessage: body.maintenanceMessage===undefined?current.maintenanceMessage:String(body.maintenanceMessage||"").trim().slice(0,500)
   };
   const pairs=[
     ["admin_maintenance_mode",next.maintenanceMode],["admin_registration_enabled",next.registrationEnabled],
     ["admin_analyzer_enabled",next.analyzerEnabled],["admin_independent_stats_enabled",next.independentStatsEnabled],
     ["admin_correct_score_enabled",next.correctScoreEnabled],["admin_booking_code_enabled",next.bookingCodeEnabled],
-    ["admin_max_analyzer_games",next.maxAnalyzerGames],["admin_min_analyzer_confidence",next.minAnalyzerConfidence]
+    ["admin_max_analyzer_games",next.maxAnalyzerGames],["admin_min_analyzer_confidence",next.minAnalyzerConfidence],
+    ["admin_assistant_enabled",next.assistantEnabled],["admin_voice_input_enabled",next.voiceInputEnabled],
+    ["admin_voice_replies_enabled",next.voiceRepliesEnabled],["admin_announcement_enabled",next.announcementEnabled],
+    ["admin_announcement_title",next.announcementTitle],["admin_announcement_message",next.announcementMessage],
+    ["admin_announcement_type",next.announcementType],["admin_notifications_enabled",next.notificationsEnabled],
+    ["admin_browser_notifications_enabled",next.browserNotificationsEnabled],["admin_maintenance_message",next.maintenanceMessage]
   ];
   for(const [key,value] of pairs) await q("insert into app_settings(key,value,updated_at) values($1,$2,now()) on conflict(key) do update set value=excluded.value,updated_at=now()",[key,JSON.stringify(value)]);
   return next;
