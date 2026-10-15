@@ -37,6 +37,7 @@ function parseCriteria(text){
   if(!criteria.length)throw new Error("Which market and option should I search? For example: BTTS Yes, Over 2.5 goals, 1X2 Home, Double Chance 1X, or a mix of markets.");
   for(const c of criteria){
     if(c.line!==undefined&&(!Number.isFinite(c.line)||c.line<0.5||c.line>20))throw new Error("Please specify a valid market line.");
+    if(c.type==="goals"&&![0.5,1.5,2.5,3.5,4.5].includes(c.line))throw new Error("Supported goal lines are 0.5, 1.5, 2.5, 3.5 and 4.5.");
   }
   return criteria;
 }
