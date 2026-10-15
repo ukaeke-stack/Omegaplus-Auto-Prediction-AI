@@ -2,7 +2,8 @@
 const $=s=>document.querySelector(s),esc=v=>String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let lastRequest=null,lastSelections=[],conversationId=null;
 async function api(url,options={}){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);try{const r=await fetch(url,{credentials:"same-origin",...options,signal:controller.signal,headers:{"Content-Type":"application/json",...(options.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||(r.status===401?"Please log in before using the assistant.":"Assistant request failed (HTTP "+r.status+")."));return d}catch(error){if(error.name==="AbortError")throw new Error("The assistant took too long to respond. Please try again.");throw error}finally{clearTimeout(timer)}}
-function say(text){const SR=window.SpeechSynthesisUtterance;if(!SR)return;try{speechSynthesis.cancel();speechSynthesis.speak(new SR(text))}catch{}}
+function say(text){const synth=window.speechSynthesis,SR=window.SpeechSynthesisUtterance;if(!synth||!SR)return false;try{const utterance=new SR(String(text||""));utterance.lang="en-NG";utterance.rate=1;utterance.pitch=1;utterance.volume=1;synth.cancel();const voices=synth.getVoices();const voice=voices.find(v=>/^en(-NG|-GB|-US)?$/i.test(v.lang))||voices.find(v=>/^en/i.test(v.lang));if(voice)utterance.voice=voice;utterance.onerror=()=>{const status=$("#assistantHomeStatus")||$("#assistantStatus");if(status)status.textContent="Spoken reply could not play. Tap Speak reply and check your phone media volume.";};synth.speak(utterance);return true}catch{return false}}
+function addSpeakButton(target,text){if(!target)return;const b=document.createElement("button");b.type="button";b.className="secondary";b.textContent="🔊 Speak reply";b.style.marginTop="8px";b.setAttribute("aria-label","Play assistant reply aloud");b.addEventListener("click",()=>{if(!say(text)){const status=$("#assistantHomeStatus")||$("#assistantStatus");if(status)status.textContent="Speech is not supported in this browser. Try Chrome and check text-to-speech settings.";}});target.appendChild(b)}
 function setStatus(text){const el=$("#assistantStatus");if(el)el.textContent=text}
 function drawSlipImage(code){
  const canvas=document.createElement("canvas"),w=1000,lineH=54,head=230,foot=code?190:90,h=head+lastSelections.length*lineH+foot;
@@ -48,9 +49,9 @@ async function submitPrompt(options={}){
    return;
   }
   const reply=String(d.reply||"I received your message, but no reply was returned. Please try again.");
-  if(home){showHomeReply(reply);showHomeStatus("Answered by "+String(d.provider||"Omegaplus AI")+(d.fallbackUsed?" after a provider fallback.":"."));}
-  else{if(results)results.innerHTML='<article class="assistant-fixture assistant-conversation-reply"><div><b>OMEGAPLUS AI</b><p>'+esc(reply)+'</p></div></article>';setStatus("Answered by "+String(d.provider||"Omegaplus AI")+(d.fallbackUsed?" after a provider fallback.":"."));}
-  say(reply);
+  if(home){const homeReply=showHomeReply(reply);addSpeakButton(homeReply,reply);showHomeStatus("Answered by "+String(d.provider||"Omegaplus AI")+(d.fallbackUsed?" after a provider fallback.":"."));}
+  else{if(results){results.innerHTML='<article class="assistant-fixture assistant-conversation-reply"><div><b>OMEGAPLUS AI</b><p>'+esc(reply)+'</p></div></article>';addSpeakButton(results.querySelector(".assistant-conversation-reply"),reply);}setStatus("Answered by "+String(d.provider||"Omegaplus AI")+(d.fallbackUsed?" after a provider fallback.":"."));}
+  if(!say(reply)){if(home)showHomeStatus("Reply displayed. Tap Speak reply to hear it aloud.");else setStatus("Reply displayed. Tap Speak reply to hear it aloud.");}
  }catch(e){
   if(home){showHomeStatus("Assistant request failed.");showHomeReply(e.message||"The assistant could not respond. Please try again.",true);}
   else{setStatus(e.message||"The assistant could not respond. Please try again.");if(results)results.innerHTML='<article class="assistant-fixture assistant-conversation-reply"><div><b>ASSISTANT ERROR</b><p>'+esc(e.message||"The assistant could not respond. Please try again.")+'</p></div></article>';}
