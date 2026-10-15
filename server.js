@@ -1479,6 +1479,44 @@ app.post("/api/snap-predict/better-options",requirePaid,async(req,r)=>{
   }catch(e){r.status(502).json({ok:false,error:e.message||"Could not find alternatives right now."})}
 });
 
+function assistantMarketMatches(market,criterion){
+  const name=String(market.marketName||"").toLowerCase(),outcomes=Array.isArray(market.outcomes)?market.outcomes:[];
+  if(criterion.type==="any")return true;
+  if(criterion.type==="goals")return /over.?under|total goals|total score|goals total|goals/.test(name)&&!/corner|card|booking|team total|first half|1st half|half time|asian handicap/.test(name);
+  if(criterion.type==="corners")return /corner/.test(name)&&/over.?under|total/.test(name);
+  if(criterion.type==="cards")return /card|booking/.test(name)&&/over.?under|total/.test(name);
+  if(criterion.type==="btts")return /both teams|btts/.test(name);
+  if(criterion.type==="1x2")return /(^|\\b)1x2(\\b|$)|match result|full.?time result|winner/.test(name)&&!/double chance|draw no bet/.test(name);
+  if(criterion.type==="double_chance")return /double chance/.test(name);
+  if(criterion.type==="dnb")return /draw no bet/.test(name);
+  return false;
+}
+function assistantOutcomeMatches(market,outcome,criterion){
+  const name=String(market.marketName||"").toLowerCase(),pick=String(outcome.outcomeName||"").trim().toLowerCase();
+  if(criterion.type==="any")return true;
+  if(criterion.type==="goals"||criterion.type==="corners"||criterion.type==="cards"){
+    const dir=criterion.direction;
+    if(!new RegExp("\\b"+dir+"\\b","i").test(pick))return false;
+    const spec=String(market.specifier||"");
+    const lineFromSpec=spec.match(/(?:total|goals?|corners?|cards?|line)\\s*[=:]\\s*(\\d+(?:\\.\\d+)?)/i);
+    const lineFromPick=pick.match(/\\b(?:over|under)\\s*(\\d+(?:\\.\\d+)?)/i);
+    const anyLine=spec.match(/\\d+(?:\\.\\d+)?/);
+    const line=Number(lineFromSpec?.[1]||lineFromPick?.[1]||anyLine?.[0]||NaN);
+    return Number.isFinite(line)&&Math.abs(line-criterion.line)<0.001;
+  }
+  if(criterion.type==="btts")return criterion.option==="Yes"?/^(yes|btts yes|both teams to score yes)$/.test(pick):/^(no|btts no|both teams to score no)$/.test(pick);
+  if(criterion.type==="1x2"){
+    if(criterion.option==="Home")return /^(home|home win|1|1x2 home)$/.test(pick)||/home/.test(pick);
+    if(criterion.option==="Draw")return /^(draw|tie|x|1x2 draw)$/.test(pick)||/\\bdraw\\b/.test(pick);
+    return /^(away|away win|2|1x2 away)$/.test(pick)||/away/.test(pick);
+  }
+  if(criterion.type==="double_chance"){
+    const normalized=pick.replace(/\\s+/g,"").replace(/homeordraw|homedraw/g,"1x").replace(/draworaway|drawaway/g,"x2").replace(/homeoraway/g,"12");
+    return normalized===criterion.option.toLowerCase()||normalized.includes(criterion.option.toLowerCase());
+  }
+  if(criterion.type==="dnb")return criterion.option==="Home"?/^(home|home win|1)$/.test(pick)||/home/.test(pick):/^(away|away win|2)$/.test(pick)||/away/.test(pick);
+  return false;
+}
 async function selectAssistantFixtures(request){
   const all=[];
   for(const day of request.dates){
@@ -1486,29 +1524,29 @@ async function selectAssistantFixtures(request){
     for(const fixture of result.fixtures||[]){
       if(!fixture.eventId||!fixture.home||!fixture.away)continue;
       for(const market of fixture.markets||[]){
-        const name=String(market.marketName||"").toLowerCase();
-        if(!marketMatchesType(market,"ou")||/corner|card|booking|team total|first half|1st half|half time/.test(name))continue;
-        for(const outcome of market.outcomes||[]){
-          if(outcome.isActive===false||!Number.isFinite(Number(outcome.odds))||Number(outcome.odds)<=1)continue;
-          const outcomeName=String(outcome.outcomeName||"");
-          if(!new RegExp("\\b"+request.direction+"\\b","i").test(outcomeName))continue;
-          const specifierText=String(market.specifier||"");
-          const explicitLine=specifierText.match(/(?:total|goals?|line)\s*[=:]\s*(\d+(?:\.\d+)?)/i);
-          const outcomeLine=outcomeName.match(/\b(?:over|under)\s*(\d+(?:\.\d+)?)/i);
-          const anyLine=specifierText.match(/\d+(?:\.\d+)?/);
-          const actualLine=Number(explicitLine?.[1]||outcomeLine?.[1]||anyLine?.[0]||NaN);
-          if(!Number.isFinite(actualLine)||Math.abs(actualLine-request.line)>0.001)continue;
-          all.push({eventId:String(fixture.eventId),home:String(fixture.home),away:String(fixture.away),league:String(fixture.league||""),date:day.date,startTimeMs:Number(fixture.startTimeMs||0),pick:(request.direction==="over"?"Over ":"Under ")+request.line,marketId:String(market.marketId),specifier:market.specifier??null,outcomeId:String(outcome.outcomeId),odds:Number(outcome.odds),confidence:confidenceForOutcome(market,outcome),sport:"football"});
+        for(const criterion of request.criteria||[]){
+          if(!assistantMarketMatches(market,criterion))continue;
+          for(const outcome of market.outcomes||[]){
+            if(outcome.isActive===false||!Number.isFinite(Number(outcome.odds))||Number(outcome.odds)<=1)continue;
+            if(!assistantOutcomeMatches(market,outcome,criterion))continue;
+            const pick=criterion.type==="any"?String(outcome.outcomeName||market.marketName||"Selection"):criterion.label;
+            all.push({eventId:String(fixture.eventId),home:String(fixture.home),away:String(fixture.away),league:String(fixture.league||""),date:day.date,startTimeMs:Number(fixture.startTimeMs||0),pick,marketLabel:String(market.marketName||criterion.label),marketId:String(market.marketId),specifier:market.specifier??null,outcomeId:String(outcome.outcomeId),odds:Number(outcome.odds),confidence:confidenceForOutcome(market,outcome),sport:"football"});
+          }
         }
       }
     }
   }
   const unique=new Map();
   for(const row of all){
-    const key=row.eventId+"|"+row.date,previous=unique.get(key);
+    const key=[row.eventId,row.date,row.marketId,String(row.specifier||""),row.outcomeId].join("|");
+    const previous=unique.get(key);
     if(!previous||row.confidence>previous.confidence)unique.set(key,row);
   }
-  return [...unique.values()].sort((a,b)=>b.confidence-a.confidence||a.startTimeMs-b.startTimeMs).slice(0,request.requestedGames);
+  const mixed=(request.criteria||[]).length>1||(request.criteria||[]).some(c=>c.type==="any");
+  const ranked=[...unique.values()].sort((a,b)=>b.confidence-a.confidence||a.startTimeMs-b.startTimeMs);
+  if(mixed)return ranked.slice(0,request.requestedGames);
+  const seen=new Set();
+  return ranked.filter(row=>{if(seen.has(row.eventId))return false;seen.add(row.eventId);return true}).slice(0,request.requestedGames);
 }
 app.get("/api/assistant/conversations",requireAuth,async(req,res)=>{
   try{res.json({ok:true,conversations:await listUserConversations(req.user.id)});}
