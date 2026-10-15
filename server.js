@@ -1820,9 +1820,9 @@ app.post("/api/bet-builder",requirePaid,async(req,res)=>{
 app.get("/api/prediction-calibration",async(req,res)=>{
  try{
    const today=localDayKey(Date.now());
-   const to=String(req.query.to||today),from=String(req.query.from||new Date(Date.now()-29*86400000).toLocaleDateString("en-CA",{timeZone:"Africa/Lagos"}));
+   const to=String(req.query.to||today),from=String(req.query.from||localDayKey(Date.now()-29*86400000));
    const sport=String(req.query.sport||"football");
-   const validDate=value=>/^\\d{4}-\\d{2}-\\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value+"T00:00:00Z"));
+   const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value+"T00:00:00Z"));
    if(!validDate(from)||!validDate(to)||from>to)return res.status(400).json({ok:false,error:"Use valid from/to dates in YYYY-MM-DD format, with from no later than to."});
    if(!["football","basketball","baseball","ice_hockey","tennis","table_tennis"].includes(sport))return res.status(400).json({ok:false,error:"Unsupported sport."});
    const days=Math.round((Date.parse(to+"T00:00:00Z")-Date.parse(from+"T00:00:00Z"))/86400000)+1;
