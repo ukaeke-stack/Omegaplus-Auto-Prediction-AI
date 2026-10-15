@@ -108,7 +108,7 @@ async function voice(promptSelector="#assistantPrompt",buttonSelector="#assistan
  if(!assistantConfig.assistantEnabled||!assistantConfig.voiceInputEnabled){const msg="Voice input is temporarily disabled by the administrator.";if(promptSelector==="#assistantPromptHome")showHomeStatus(msg);else setStatus(msg);return}
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){setStatus("Voice input is not supported by this browser. You can type the request instead.");return}
- const rec=new SR();rec.lang="en-NG";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;
+ const rec=new SR();rec.lang="en-NG";rec.continuous=false;rec.interimResults=false;rec.maxAlternatives=1;
  const b=$(buttonSelector);if(!b)return;b.disabled=true;b.textContent="Listening…";
  let transcript="",silenceTimer=null,submitted=false;
  const finish=()=>{if(submitted)return;submitted=true;clearTimeout(silenceTimer);try{rec.stop()}catch{};const text=transcript.trim();if(!text){if(promptSelector==="#assistantPromptHome")showHomeStatus("I didn't catch a complete request. Please speak again or type it.");else setStatus("I didn't catch a complete request. Please speak again or type it.");return}
@@ -117,9 +117,9 @@ async function voice(promptSelector="#assistantPrompt",buttonSelector="#assistan
  else{setStatus("You’ve finished speaking. Processing your request…");submitPrompt({prompt:text})}
  };
  rec.onresult=e=>{
-   let combined="";
-   for(let i=0;i<e.results.length;i++){const result=e.results[i];if(result&&result[0])combined+=result[0].transcript+" "}
-   transcript=combined.trim();
+   const parts=[];
+   for(let i=e.resultIndex;i<e.results.length;i++){const result=e.results[i];if(result&&result.isFinal&&result[0])parts.push(String(result[0].transcript||"").trim())}
+   if(parts.length)transcript=parts.join(" ").trim();
    if(silenceTimer)clearTimeout(silenceTimer);
    silenceTimer=setTimeout(finish,2200);
  };
