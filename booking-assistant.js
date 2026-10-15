@@ -13,7 +13,8 @@ function parseCriteria(text){
   const add=(c)=>{if(!criteria.some(x=>JSON.stringify(x)===JSON.stringify(c)))criteria.push(c)};
   const lineRe=/\\b(over|under)\\s*(?:total\\s*)?(?:(goals?|corners?|cards?|bookings?)\\s*)?(\\d+(?:\\.\\d+)?)\\b/gi;
   for(const m of q.matchAll(lineRe)){
-    const category=/corner/.test(m[2]||"")?"corners":/card|booking/.test(m[2]||"")?"cards":"goals";
+    const surrounding=q.slice(m.index,Math.min(q.length,m.index+m[0].length+18));
+    const category=/corner/.test((m[2]||"")+" "+surrounding)?"corners":/card|booking/.test((m[2]||"")+" "+surrounding)?"cards":"goals";
     add({type:category,direction:m[1].toLowerCase(),line:Number(m[3]),label:(m[1][0].toUpperCase()+m[1].slice(1))+" "+m[3]+(category==="goals"?" goals":category==="corners"?" corners":" cards")});
   }
   if(/\\b(btts|both teams to score)\\b/.test(q)){
