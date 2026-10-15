@@ -58,8 +58,8 @@ jobs:
       - name: Verify private assistant API requires login
         run: |
           CODE=$(curl --silent --show-error --max-time 20 -o /tmp/auth-check.json -w '%{http_code}' -X POST "https://omegaplus-auto-prediction-ai.onrender.com/api/assistant/chat" -H 'content-type: application/json' --data '{"message":"production smoke check"}')
-          node -e 'const fs=require("fs"),d=JSON.parse(fs.readFileSync("/tmp/auth-check.json","utf8")); if(process.env.STATUS!=="401"||d.ok!==false||d.code!=="AUTH_REQUIRED") process.exit(1); console.log("Private assistant API correctly requires authentication.")' STATUS="$CODE"
+          STATUS="$CODE" node -e 'const fs=require("fs"),d=JSON.parse(fs.readFileSync("/tmp/auth-check.json","utf8")); if(process.env.STATUS!=="401"||d.ok!==false||d.code!=="AUTH_REQUIRED") process.exit(1); console.log("Private assistant API correctly requires authentication.")'
       - name: Verify calibration validation rejects invalid inputs
         run: |
           CODE=$(curl --silent --show-error --max-time 20 -o /tmp/invalid-date.json -w '%{http_code}' "https://omegaplus-auto-prediction-ai.onrender.com/api/prediction-calibration?from=2026-02-30&to=2026-02-30")
-          node -e 'const fs=require("fs"),d=JSON.parse(fs.readFileSync("/tmp/invalid-date.json","utf8")); if(process.env.STATUS!=="400"||d.ok!==false) process.exit(1); console.log("Invalid calendar dates are rejected.")' STATUS="$CODE"
+          STATUS="$CODE" node -e 'const fs=require("fs"),d=JSON.parse(fs.readFileSync("/tmp/invalid-date.json","utf8")); if(process.env.STATUS!=="400"||d.ok!==false) process.exit(1); console.log("Invalid calendar dates are rejected.")'
