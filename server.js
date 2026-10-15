@@ -1817,6 +1817,38 @@ app.post("/api/bet-builder",requirePaid,async(req,res)=>{
  try{const rows=Array.isArray(req.body?.predictions)?req.body.predictions:[];const mode=String(req.body?.mode||"conservative");res.json({ok:true,mode,predictions:buildBetBuilder(rows,mode)})}
  catch(e){res.status(400).json({ok:false,error:e.message,predictions:[]})}
 });
+app.get("/api/prediction-calibration",async(req,res)=>{
+ try{
+   const today=localDayKey(Date.now());
+   const to=String(req.query.to||today),from=String(req.query.from||new Date(Date.now()-29*86400000).toLocaleDateString("en-CA",{timeZone:"Africa/Lagos"}));
+   const sport=String(req.query.sport||"football");
+   const validDate=value=>/^\\d{4}-\\d{2}-\\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value+"T00:00:00Z"));
+   if(!validDate(from)||!validDate(to)||from>to)return res.status(400).json({ok:false,error:"Use valid from/to dates in YYYY-MM-DD format, with from no later than to."});
+   if(!["football","basketball","baseball","ice_hockey","tennis","table_tennis"].includes(sport))return res.status(400).json({ok:false,error:"Unsupported sport."});
+   const days=Math.round((Date.parse(to+"T00:00:00Z")-Date.parse(from+"T00:00:00Z"))/86400000)+1;
+   if(days>90)return res.status(400).json({ok:false,error:"Calibration reports are limited to 90 days per request."});
+   const dates=Array.from({length:days},(_,i)=>new Date(Date.parse(from+"T00:00:00Z")+i*86400000).toISOString().slice(0,10));
+   const archives=[];
+   for(let i=0;i<dates.length;i+=6){
+     const batch=await Promise.all(dates.slice(i,i+6).map(async date=>({date,archive:await readPersistentArchive(date,sport).catch(()=>null)})));
+     archives.push(...batch);
+   }
+   const rows=[],seen=new Set();
+   for(const {date,archive} of archives){
+     const candidates=[...(Array.isArray(archive?.predictions)?archive.predictions:[]),...(Array.isArray(archive?.dailyBestPredictions)?archive.dailyBestPredictions:[])];
+     for(const row of candidates){
+       if(!row||typeof row!=="object")continue;
+       const identity=String(row.id||row.eventId||[row.home,row.away,row.market,row.pick,date].join("|"));
+       const key=date+"|"+identity;
+       if(seen.has(key))continue;
+       seen.add(key);rows.push({...row,archiveDate:date});
+     }
+   }
+   res.json({ok:true,from,to,sport,archivesRead:archives.length,sourcePredictionCount:rows.length,...summarizePredictionCalibration(rows)});
+ }catch(error){
+   res.status(503).json({ok:false,error:"Prediction calibration data is temporarily unavailable."});
+ }
+});
 app.get("/api/performance-advanced",async(req,res)=>{
  try{const today=localDayKey(Date.now()),from=String(req.query.from||today),to=String(req.query.to||from);res.json({ok:true,from,to,...await performanceFromArchives(d=>readPersistentArchive(d),from,to)})}
  catch(e){res.status(200).json({ok:false,error:e.message,totalPredictions:0,settled:0,won:0,lost:0,accuracy:null,byMarket:{},byLeague:{}})}
