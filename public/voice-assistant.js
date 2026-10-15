@@ -63,7 +63,7 @@ function voice(promptSelector="#assistantPrompt",buttonSelector="#assistantMic")
  if(!SR){setStatus("Voice input is not supported by this browser. You can type the request instead.");return}
  const rec=new SR();rec.lang="en-NG";rec.interimResults=false;rec.maxAlternatives=1;
  const b=$(buttonSelector);if(!b)return;b.disabled=true;b.textContent="Listening…";
- rec.onresult=e=>{const input=$(promptSelector),transcript=String(e.results?.[0]?.[0]?.transcript||"").trim();if(!input||!transcript){setStatus("I could not hear a clear request. Please try again or type it.");return}input.value=transcript;setStatus("Voice request captured. Processing your command…");submitPrompt();};
+ rec.onresult=e=>{const input=$(promptSelector),transcript=String(e.results?.[0]?.[0]?.transcript||"").trim();if(!input||!transcript){setStatus("I could not hear a clear request. Please try again or type it.");return}input.value=transcript;setStatus("Voice request captured. Processing your command…");if(promptSelector==="#assistantPromptHome"){$("#assistantLaunch")?.click()}else{submitPrompt()}};
  rec.onerror=e=>setStatus(e.error==="not-allowed"?"Microphone permission was denied. Allow microphone access or type your request.":"Voice input failed. You can type the request instead.");
  rec.onend=()=>{b.disabled=false;b.textContent="🎙 Speak";};
  try{rec.start()}catch(error){b.disabled=false;b.textContent="🎙 Speak";setStatus("Could not start microphone input. Check browser microphone permission and try again.");}
