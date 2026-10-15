@@ -722,6 +722,19 @@ app.post("/api/payments/paystack/webhook",async(req,r)=>{
 
 app.get("/api/admin/system-settings",requireRole("admin"),async(_,r)=>{try{r.json({ok:true,settings:await getAdminSettings()})}catch(e){r.status(503).json({ok:false,error:e.message})}});
 app.patch("/api/admin/system-settings",requireRole("admin"),async(req,r)=>{try{const settings=await updateAdminSettings(req.body||{});await audit(req,"admin.system-settings.update","system",settings);r.json({ok:true,settings})}catch(e){r.status(400).json({ok:false,error:e.message})}});
+app.get("/api/app/config",async(_,r)=>{
+  try{
+    const s=await getAdminSettings();
+    r.setHeader("Cache-Control","no-store");
+    r.json({ok:true,config:{
+      maintenanceMode:s.maintenanceMode,maintenanceMessage:s.maintenanceMessage,
+      assistantEnabled:s.assistantEnabled,voiceInputEnabled:s.voiceInputEnabled,voiceRepliesEnabled:s.voiceRepliesEnabled,
+      announcementEnabled:s.announcementEnabled,announcementTitle:s.announcementTitle,
+      announcementMessage:s.announcementMessage,announcementType:s.announcementType,
+      notificationsEnabled:s.notificationsEnabled,browserNotificationsEnabled:s.browserNotificationsEnabled
+    }});
+  }catch(e){r.status(503).json({ok:false,error:"App configuration is temporarily unavailable."})}
+});
 app.post("/api/admin/create-admin",requireRole("admin"),async(req,r)=>{try{const user=await createAdminUser(req.body||{},req);r.status(201).json({ok:true,user})}catch(e){r.status(400).json({ok:false,error:e.message})}});
 app.get("/api/admin/stats",requireRole("admin"),async(_,r)=>{try{r.json({ok:true,stats:await adminStats()})}catch(e){r.status(503).json({ok:false,error:e.message})}});
 app.get("/api/admin/users",requireRole("admin"),async(req,r)=>{try{r.json({ok:true,users:await adminUsers({page:req.query.page,limit:req.query.limit,search:req.query.search})})}catch(e){r.status(503).json({ok:false,error:e.message,users:[]})}});
