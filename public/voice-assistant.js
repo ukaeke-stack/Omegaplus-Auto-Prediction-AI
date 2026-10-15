@@ -1,9 +1,11 @@
 (()=>{"use strict";
 const $=s=>document.querySelector(s),esc=v=>String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let lastRequest=null,lastSelections=[],conversationId=null;
+let assistantConfig={assistantEnabled:true,voiceInputEnabled:true,voiceRepliesEnabled:true};
+async function loadAssistantConfig(){try{const r=await fetch("/api/app/config",{credentials:"same-origin",cache:"no-store"});const d=await r.json();if(r.ok&&d.ok&&d.config)assistantConfig={...assistantConfig,...d.config}}catch{}return assistantConfig}
 async function api(url,options={}){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);try{const r=await fetch(url,{credentials:"same-origin",...options,signal:controller.signal,headers:{"Content-Type":"application/json",...(options.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||(r.status===401?"Please log in before using the assistant.":"Assistant request failed (HTTP "+r.status+")."));return d}catch(error){if(error.name==="AbortError")throw new Error("The assistant took too long to respond. Please try again.");throw error}finally{clearTimeout(timer)}}
-function say(text){const synth=window.speechSynthesis,SR=window.SpeechSynthesisUtterance;if(!synth||!SR)return false;try{const utterance=new SR(String(text||""));utterance.lang="en-NG";utterance.rate=1;utterance.pitch=1;utterance.volume=1;synth.cancel();const voices=synth.getVoices();const voice=voices.find(v=>/^en(-NG|-GB|-US)?$/i.test(v.lang))||voices.find(v=>/^en/i.test(v.lang));if(voice)utterance.voice=voice;utterance.onerror=()=>{const status=$("#assistantHomeStatus")||$("#assistantStatus");if(status)status.textContent="Spoken reply could not play. Tap Speak reply and check your phone media volume.";};synth.speak(utterance);return true}catch{return false}}
-function addSpeakButton(target,text){if(!target)return;const b=document.createElement("button");b.type="button";b.className="secondary";b.textContent="🔊 Speak reply";b.style.marginTop="8px";b.setAttribute("aria-label","Play assistant reply aloud");b.addEventListener("click",()=>{if(!say(text)){const status=$("#assistantHomeStatus")||$("#assistantStatus");if(status)status.textContent="Speech is not supported in this browser. Try Chrome and check text-to-speech settings.";}});target.appendChild(b)}
+function say(text){if(!assistantConfig.assistantEnabled||!assistantConfig.voiceRepliesEnabled)return false;const synth=window.speechSynthesis,SR=window.SpeechSynthesisUtterance;if(!synth||!SR)return false;try{const utterance=new SR(String(text||""));utterance.lang="en-NG";utterance.rate=1;utterance.pitch=1;utterance.volume=1;synth.cancel();const voices=synth.getVoices();const voice=voices.find(v=>/^en(-NG|-GB|-US)?$/i.test(v.lang))||voices.find(v=>/^en/i.test(v.lang));if(voice)utterance.voice=voice;utterance.onerror=()=>{const status=$("#assistantHomeStatus")||$("#assistantStatus");if(status)status.textContent="Spoken reply could not play. Tap Speak reply and check your phone media volume.";};synth.speak(utterance);return true}catch{return false}}
+function addSpeakButton(target,text){if(!target||!assistantConfig.assistantEnabled||!assistantConfig.voiceRepliesEnabled)return;const b=document.createElement("button");b.type="button";b.className="secondary";b.textContent="🔊 Speak reply";b.style.marginTop="8px";b.setAttribute("aria-label","Play assistant reply aloud");b.addEventListener("click",()=>{if(!say(text)){const status=$("#assistantHomeStatus")||$("#assistantStatus");if(status)status.textContent="Speech is not supported in this browser. Try Chrome and check text-to-speech settings.";}});target.appendChild(b)}
 function setStatus(text){const el=$("#assistantStatus");if(el)el.textContent=text}
 function drawSlipImage(code){
  const canvas=document.createElement("canvas"),w=1000,lineH=54,head=230,foot=code?190:90,h=head+lastSelections.length*lineH+foot;
@@ -38,6 +40,8 @@ function openAssistantPage(){document.querySelectorAll(".page").forEach(p=>p.cla
 async function submitPrompt(options={}){
  const home=Boolean(options.home),input=$("#assistantPrompt"),prompt=String(options.prompt??input?.value??"").trim();
  if(!prompt){if(home)showHomeStatus("Type or say what you want help with.");else setStatus("Type or say what you want help with.");return}
+ await loadAssistantConfig();
+ if(!assistantConfig.assistantEnabled){const msg="The AI assistant is temporarily disabled by the administrator.";if(home){showHomeStatus(msg);showHomeReply(msg,true)}else setStatus(msg);return}
  if(input&&options.prompt!==undefined)input.value=prompt;
  if(lastSelections.length&&/\b(generate|create|make|get)\b.{0,35}\b(booking\s*code|code)\b/i.test(prompt)){
    if(home){showHomeStatus("Generating the booking code for the reviewed selections…");openAssistantPage()}
@@ -99,7 +103,9 @@ async function generateCode(){
  }catch(e){status.textContent=e.message; if(/paid|subscription|plan/i.test(e.message))status.textContent=e.message+" You can review the selected games, but code generation follows your account's booking-code access.";say(e.message)}
  finally{btn.disabled=false}
 }
-function voice(promptSelector="#assistantPrompt",buttonSelector="#assistantMic"){
+async function voice(promptSelector="#assistantPrompt",buttonSelector="#assistantMic"){
+ await loadAssistantConfig();
+ if(!assistantConfig.assistantEnabled||!assistantConfig.voiceInputEnabled){setStatus("Voice input is temporarily disabled by the administrator.");return}
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){setStatus("Voice input is not supported by this browser. You can type the request instead.");return}
  const rec=new SR();rec.lang="en-NG";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;
@@ -123,6 +129,7 @@ function voice(promptSelector="#assistantPrompt",buttonSelector="#assistantMic")
  catch(error){b.disabled=false;b.textContent="🎙 Speak";setStatus("Could not start microphone input. Check browser microphone permission and try again.");}
 }
 function init(){
+ loadAssistantConfig();
  const nav=document.querySelector(".side-nav");
  if(nav&&!nav.querySelector('[data-page="voice-assistant"]')){const b=document.createElement("button");b.dataset.page="voice-assistant";b.innerHTML="⌕ <span>Voice & Text Assistant</span>";nav.insertBefore(b,nav.children[1]||null)}
  document.querySelectorAll('[data-page="voice-assistant"]').forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".page").forEach(p=>p.classList.remove("active-page"));$("#page-voice-assistant")?.classList.add("active-page");document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page==="voice-assistant"));$("#side")?.classList.remove("open");$("#backdrop")?.classList.remove("show")}));
