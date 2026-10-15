@@ -1,4 +1,4 @@
-const PROVIDER_ORDER = ["ollama", "groq", "gemini"];
+const PROVIDER_ORDER = ["groq", "gemini", "ollama"];
 
 const DEFAULT_MODELS = {
   groq: "openai/gpt-oss-120b",
