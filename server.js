@@ -1822,7 +1822,7 @@ app.get("/api/prediction-calibration",async(req,res)=>{
    const today=localDayKey(Date.now());
    const to=String(req.query.to||today),from=String(req.query.from||localDayKey(Date.now()-29*86400000));
    const sport=String(req.query.sport||"football");
-   const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value+"T00:00:00Z"));
+   const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value+"T00:00:00Z"))&&new Date(value+"T00:00:00Z").toISOString().slice(0,10)===value;
    if(!validDate(from)||!validDate(to)||from>to)return res.status(400).json({ok:false,error:"Use valid from/to dates in YYYY-MM-DD format, with from no later than to."});
    if(!["football","basketball","baseball","ice_hockey","tennis","table_tennis"].includes(sport))return res.status(400).json({ok:false,error:"Unsupported sport."});
    const days=Math.round((Date.parse(to+"T00:00:00Z")-Date.parse(from+"T00:00:00Z"))/86400000)+1;
@@ -1830,7 +1830,7 @@ app.get("/api/prediction-calibration",async(req,res)=>{
    const dates=Array.from({length:days},(_,i)=>new Date(Date.parse(from+"T00:00:00Z")+i*86400000).toISOString().slice(0,10));
    const archives=[];
    for(let i=0;i<dates.length;i+=6){
-     const batch=await Promise.all(dates.slice(i,i+6).map(async date=>({date,archive:await readPersistentArchive(date,sport).catch(()=>null)})));
+     const batch=await Promise.all(dates.slice(i,i+6).map(async date=>({date,archive:await readPersistentArchive(date,sport)})));
      archives.push(...batch);
    }
    const rows=[],seen=new Set();
@@ -1838,13 +1838,13 @@ app.get("/api/prediction-calibration",async(req,res)=>{
      const candidates=[...(Array.isArray(archive?.predictions)?archive.predictions:[]),...(Array.isArray(archive?.dailyBestPredictions)?archive.dailyBestPredictions:[])];
      for(const row of candidates){
        if(!row||typeof row!=="object")continue;
-       const identity=String(row.id||row.eventId||[row.home,row.away,row.market,row.pick,date].join("|"));
+       const identity=[row.id,row.eventId,row.marketType||row.market,row.pick||row.selection,row.home,row.away].filter(value=>value!==undefined&&value!==null&&String(value)!=="").join("|")||date;
        const key=date+"|"+identity;
        if(seen.has(key))continue;
        seen.add(key);rows.push({...row,archiveDate:date});
      }
    }
-   res.json({ok:true,from,to,sport,archivesRead:archives.length,sourcePredictionCount:rows.length,...summarizePredictionCalibration(rows)});
+   res.json({ok:true,from,to,sport,archiveDaysChecked:archives.length,archivesRead:archives.filter(item=>item.archive).length,sourcePredictionCount:rows.length,...summarizePredictionCalibration(rows)});
  }catch(error){
    res.status(503).json({ok:false,error:"Prediction calibration data is temporarily unavailable."});
  }
