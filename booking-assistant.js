@@ -33,7 +33,7 @@ function parseCriteria(text){
     const option=/\b(away win|away team|away)\b/.test(q)?"Away":/\b(draw|tie)\b/.test(q)?"Draw":"Home";
     add({type:"1x2",option,label:"1X2 "+option});
   }
-  if(/\b(any market|any option|best games|best picks|mix(?:ed)? markets|mixed options|mix options|all markets)\b/.test(q))add({type:"any",label:"Best available markets"});
+  if(/\b(any market|any options?|best(?:\s+\d{1,2})?\s+games|best picks|recommend|mix(?:ed)? markets|mixed options|mix options|all markets)\b/.test(q))add({type:"any",label:"Best available markets"});
   if(!criteria.length)throw new Error("Which market and option should I search? For example: BTTS Yes, Over 2.5 goals, 1X2 Home, Double Chance 1X, or a mix of markets.");
   for(const c of criteria){
     if(c.line!==undefined&&(!Number.isFinite(c.line)||c.line<0.5||c.line>20))throw new Error("Please specify a valid market line.");
