@@ -60,7 +60,7 @@ async function sendMessage(){
  const input=$("#aiChatInput"),message=String(input?.value||"").trim();
  if(!message){status("Type a message first.");return}
  if(message.length>2000){status("Keep each message under 2,000 characters.");return}
- if(pendingBooking&&/\\b(generate|create|make|get|give)\\b.{0,35}\\b(booking\\s*code|code)\\b/i.test(message)){
+ if(pendingBooking&&/\b(generate|create|make|get|give)\b.{0,35}\b(booking\s*code|code)\b/i.test(message)){
    input.value="";
    const box=$("#aiChatMessages");
    if(box)box.insertAdjacentHTML("beforeend",'<article class="ai-chat-message user"><small>YOU</small><div>'+esc(message)+'</div></article>');
@@ -69,7 +69,7 @@ async function sendMessage(){
    return;
  }
  let requestMessage=message,excludeEventIds=[],priorBooking=null;
- if(pendingBooking&&/\\b(look for more|find more|search more|add more|more games|more selections)\\b/i.test(message)){
+ if(pendingBooking&&/\b(look for more|find more|search more|add more|more games|more selections)\b/i.test(message)){
    priorBooking=pendingBooking;
    const request=priorBooking.request||{};
    const criteria=(request.criteria||[]).map(c=>c.type==="any"?"best games from any markets":c.label).filter(Boolean).join(" and ")||request.marketLabel||"the same market";
