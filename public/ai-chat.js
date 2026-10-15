@@ -89,6 +89,7 @@ async function sendMessage(){
   conversationId=result.conversationId;
   const history=await api("/api/assistant/conversations/"+encodeURIComponent(conversationId));
   renderMessages(history.messages||[]);
+  const latestAssistantReply=[...(history.messages||[])].reverse().find(m=>m.role==="assistant")?.content||"";
   if(result.bookingPreview){
     if(priorBooking){
       result.bookingPreview.selections=[...(priorBooking.selections||[]),...(result.bookingPreview.selections||[])];
@@ -101,7 +102,8 @@ async function sendMessage(){
     appendBookingPreview(result.bookingPreview);
   }
   status(result.provider==="booking-assistant"?"Booking request prepared. Review the selections before generating a code.":"Answered by "+result.provider+(result.fallbackUsed?" after a provider fallback.":".")); 
-  if($("#aiChatSpeak")?.checked){try{if(window.AndroidApp?.speakText){window.AndroidApp.speakText(String(result.reply||""));}else if(window.speechSynthesis&&window.SpeechSynthesisUtterance){window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(String(result.reply||""));utterance.lang="en-NG";utterance.rate=0.96;utterance.pitch=1;window.speechSynthesis.speak(utterance);}}catch(e){status("Reply received, but audio playback failed. Check the device volume and text-to-speech settings.");}}
+  const spokenReply=String(result.reply||latestAssistantReply||"").trim();
+  if($("#aiChatSpeak")?.checked&&spokenReply){try{if(window.AndroidApp?.speakText){window.AndroidApp.speakText(spokenReply);status("Reply received. Playing audio reply…");}else if(window.speechSynthesis&&window.SpeechSynthesisUtterance){window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(spokenReply);utterance.lang="en-NG";utterance.rate=0.96;utterance.pitch=1;utterance.onerror=()=>status("Reply received, but audio playback failed. Check phone media volume and text-to-speech settings.");window.speechSynthesis.speak(utterance);}else{status("Reply received as text. Audio playback is not supported in this browser.");}}catch(e){status("Reply received, but audio playback failed. Check the device volume and text-to-speech settings.");}}
  }catch(error){
   if(box){const pending=box.querySelector(".pending");if(pending)pending.remove()}
   status(error.message);
