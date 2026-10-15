@@ -17,6 +17,9 @@ jobs:
           node-version: 20
       - run: npm install
       - run: node --check server.js
+      - run: node --check public/ai-chat.js
+      - run: node --check ai-chat.js
+      - run: node --check ai-providers.js
       - run: node --check booking-assistant.js
       - run: node --check auth.js
       - run: node --check support.js
@@ -24,5 +27,8 @@ jobs:
       - run: node --check public/offline-first.js
       - run: node --check social-publishing.js
       - run: node --check public/voice-assistant.js
+      - run: node --check public/admin.js
+      - run: node --check public/admin-support.js
+      - run: node --check public/app-notifications.js
       - run: node --check public/sw.js
       - run: npm test

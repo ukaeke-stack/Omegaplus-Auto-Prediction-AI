@@ -1,6 +1,7 @@
 package com.omegaplus.proai;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.WebView;
@@ -12,6 +13,8 @@ import android.net.Uri;
 import android.content.pm.PackageInfo;
 
 public class MainActivity extends Activity {
+    private WebView webView;
+
     public class AppBridge {
         @JavascriptInterface public String getVersionName() {
             try {
@@ -43,26 +46,33 @@ public class MainActivity extends Activity {
         }
     }
 
-    private static final String APP_URL = "https://omegaplus-pro-ai.vercel.app/";
+    private static final String APP_URL = "https://omegaplus-auto-prediction-ai.onrender.com/";
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        WebView web = new WebView(this);
-        web.setWebViewClient(new WebViewClient());
-        WebSettings s = web.getSettings();
+        webView = new WebView(this);
+        webView.setWebViewClient(new WebViewClient());
+        WebSettings s = webView.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setDatabaseEnabled(true);
         s.setAllowFileAccess(false);
         s.setSupportZoom(false);
-        web.addJavascriptInterface(new AppBridge(), "AndroidApp");
-        web.loadUrl(APP_URL);
-        setContentView(web);
+        webView.addJavascriptInterface(new AppBridge(), "AndroidApp");
+        webView.loadUrl(APP_URL);
+        setContentView(webView);
     }
 
     @Override public void onBackPressed() {
-        WebView web = (WebView) findViewById(android.R.id.content);
-        if (web != null && web.canGoBack()) web.goBack();
-        else super.onBackPressed();
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+            return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle("Close Omegaplus Auto Prediction AI?")
+            .setMessage("Do you want to exit the app?")
+            .setNegativeButton("Stay", (dialog, which) -> dialog.dismiss())
+            .setPositiveButton("Exit", (dialog, which) -> finish())
+            .show();
     }
 }

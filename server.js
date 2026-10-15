@@ -12,6 +12,7 @@ import {createTicket,listUserTickets,getOrCreateChat,listChatMessages,addChatMes
 import {initOfflineSyncDb,readOfflineRecords,writeOfflineRecords} from "./offline-sync.js";
 import {initSocialPublishingDb,publishDailyBestToSocials,getSocialPublishingStatus} from "./social-publishing.js";
 import {parseBookingAssistantPrompt} from "./booking-assistant.js";
+import {chatForUser,listUserConversations,getUserConversation,saveAssistantExchange} from "./ai-chat.js";
 import {smartPickRank,buildBetBuilder,performanceFromArchives,buildMatchReport,oddsMovement,extractOddsSnapshot} from "./advanced-features.js";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -40,10 +41,10 @@ const BETRELAY_API_KEY=process.env.BETRELAY_API_KEY||"";
 async function betRelayFetch(pathname,options={}){if(!BETRELAY_API_KEY)throw new Error("Multi-bookmaker code service is not configured yet. Add BETRELAY_API_KEY to Railway.");const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);try{const res=await fetch(BETRELAY_BASE+pathname,{...options,headers:{Accept:"application/json","Content-Type":"application/json","X-API-Key":BETRELAY_API_KEY,...(options.headers||{})},signal:controller.signal});const text=await res.text();let body=null;try{body=text?JSON.parse(text):null}catch{}if(!res.ok)throw new Error(body?.message||("BetRelay HTTP "+res.status));if(!body)throw new Error("BetRelay returned an invalid response");return body}finally{clearTimeout(timer)}}
 function bookmakerById(id){return BOOKMAKERS.find(x=>x.id===String(id))}
 async function createSportyBooking(selections,sport="football"){
-  const requestedDates=[...new Set(selections.map(s=>String(s.date||"")).filter(d=>/^\\d{4}-\\d{2}-\\d{2}$/.test(d)))];
+  const requestedDates=[...new Set(selections.map(s=>String(s.date||"")).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)))];
   let fixtures=[];
   if(requestedDates.length){
-    for(const date of requestedDates){const day=await getDayFixtures(date,true,sport);fixtures.push(...(day.fixtures||[]));}
+    for(const date of requestedDates){const day=await getDayFixtures(date,false,sport);fixtures.push(...(day.fixtures||[]));}
   }else{
     fixtures=await getSportyFixtures(false,true,sport);
   }
@@ -638,7 +639,7 @@ app.get("/api/admin/release-check",requireRole("admin"),async(req,r)=>{
 });
 app.get("/api/sports",(_,r)=>r.json({ok:true,sports:SPORTS}));
 app.get("/health",(_,r)=>r.status(200).json({status:"healthy",service:"omegaplus-auto-prediction-ai",version:APP_VERSION,uptime:Math.round(process.uptime())}));
-app.get("/api/health",async(_,r)=>{const stats=await independentHealth();r.json({ok:true,service:"Omegaplus Auto Prediction AI",version:APP_VERSION,branch:"main",liveSportyBet:true,accountSystem:{configured:authDbConfigured(),ready:await dbReady()},independentStats:stats,multiBookmaker:BOOKMAKERS.map(x=>({id:x.id,name:x.name,codeGeneration:x.id==="sportybet"||Boolean(BETRELAY_API_KEY)}))})});
+app.get("/api/health",async(_,r)=>{const stats=await independentHealth(),configured=authDbConfigured(),ready=await dbReady();r.json({ok:true,service:"Omegaplus Auto Prediction AI",version:APP_VERSION,branch:"main",liveSportyBet:true,dbConfigured:configured,dbReady:ready,accountSystem:{configured,ready},independentStats:stats,multiBookmaker:BOOKMAKERS.map(x=>({id:x.id,name:x.name,codeGeneration:x.id==="sportybet"||Boolean(BETRELAY_API_KEY)}))})});
 app.get("/api/auth/me",async(req,r)=>{try{const user=await currentUser(req);r.json({ok:Boolean(user),user:user||null})}catch{r.json({ok:false,user:null})}});
 app.post("/api/auth/register",async(req,r)=>{try{if(!(await getAdminSettings()).registrationEnabled)return r.status(403).json({ok:false,error:"New registration is currently disabled by the administrator."});const user=await registerUser(req.body||{},req);const session=await (await import("./auth.js")).createSession(user,req);setSessionCookie(r,session.token);r.status(201).json({ok:true,user})}catch(e){r.status(400).json({ok:false,error:e.message})}});
 app.post("/api/auth/login",async(req,r)=>{try{const x=await loginUser(req.body||{},req);setSessionCookie(r,x.session.token);r.json({ok:true,user:x.user})}catch(e){r.status(401).json({ok:false,error:e.message})}});
@@ -721,6 +722,19 @@ app.post("/api/payments/paystack/webhook",async(req,r)=>{
 
 app.get("/api/admin/system-settings",requireRole("admin"),async(_,r)=>{try{r.json({ok:true,settings:await getAdminSettings()})}catch(e){r.status(503).json({ok:false,error:e.message})}});
 app.patch("/api/admin/system-settings",requireRole("admin"),async(req,r)=>{try{const settings=await updateAdminSettings(req.body||{});await audit(req,"admin.system-settings.update","system",settings);r.json({ok:true,settings})}catch(e){r.status(400).json({ok:false,error:e.message})}});
+app.get("/api/app/config",async(_,r)=>{
+  try{
+    const s=await getAdminSettings();
+    r.setHeader("Cache-Control","no-store");
+    r.json({ok:true,config:{
+      maintenanceMode:s.maintenanceMode,maintenanceMessage:s.maintenanceMessage,
+      assistantEnabled:s.assistantEnabled,voiceInputEnabled:s.voiceInputEnabled,voiceRepliesEnabled:s.voiceRepliesEnabled,
+      announcementEnabled:s.announcementEnabled,announcementTitle:s.announcementTitle,
+      announcementMessage:s.announcementMessage,announcementType:s.announcementType,
+      notificationsEnabled:s.notificationsEnabled,browserNotificationsEnabled:s.browserNotificationsEnabled
+    }});
+  }catch(e){r.status(503).json({ok:false,error:"App configuration is temporarily unavailable."})}
+});
 app.post("/api/admin/create-admin",requireRole("admin"),async(req,r)=>{try{const user=await createAdminUser(req.body||{},req);r.status(201).json({ok:true,user})}catch(e){r.status(400).json({ok:false,error:e.message})}});
 app.get("/api/admin/stats",requireRole("admin"),async(_,r)=>{try{r.json({ok:true,stats:await adminStats()})}catch(e){r.status(503).json({ok:false,error:e.message})}});
 app.get("/api/admin/users",requireRole("admin"),async(req,r)=>{try{r.json({ok:true,users:await adminUsers({page:req.query.page,limit:req.query.limit,search:req.query.search})})}catch(e){r.status(503).json({ok:false,error:e.message,users:[]})}});
@@ -1478,40 +1492,220 @@ app.post("/api/snap-predict/better-options",requirePaid,async(req,r)=>{
   }catch(e){r.status(502).json({ok:false,error:e.message||"Could not find alternatives right now."})}
 });
 
-async function selectAssistantFixtures(request){
+function assistantMarketMatches(market,criterion){
+  const name=String(market.marketName||"").toLowerCase(),outcomes=Array.isArray(market.outcomes)?market.outcomes:[];
+  if(criterion.type==="any")return true;
+  if(criterion.type==="goals")return /over.?under|total goals|total score|goals total|goals/.test(name)&&!/corner|card|booking|team total|first half|1st half|half time|asian handicap/.test(name);
+  if(criterion.type==="corners")return /corner/.test(name)&&/over.?under|total/.test(name);
+  if(criterion.type==="cards")return /card|booking/.test(name)&&/over.?under|total/.test(name);
+  if(criterion.type==="btts")return /both teams|btts/.test(name);
+  if(criterion.type==="1x2")return /(^|\b)1x2(\b|$)|match result|full.?time result|winner/.test(name)&&!/double chance|draw no bet/.test(name);
+  if(criterion.type==="double_chance")return /double chance/.test(name);
+  if(criterion.type==="dnb")return /draw no bet/.test(name);
+  return false;
+}
+function assistantOutcomeMatches(market,outcome,criterion){
+  const name=String(market.marketName||"").toLowerCase(),pick=String(outcome.outcomeName||"").trim().toLowerCase();
+  if(criterion.type==="any")return true;
+  if(criterion.type==="goals"||criterion.type==="corners"||criterion.type==="cards"){
+    const dir=criterion.direction;
+    if(!new RegExp("\\b"+dir+"\\b","i").test(pick))return false;
+    const spec=String(market.specifier||"");
+    const lineFromSpec=spec.match(/(?:total|goals?|corners?|cards?|line)\s*[=:]\s*(\d+(?:\.\d+)?)/i);
+    const lineFromPick=pick.match(/\b(?:over|under)\s*(\d+(?:\.\d+)?)/i);
+    const anyLine=spec.match(/\d+(?:\.\d+)?/);
+    const line=Number(lineFromSpec?.[1]||lineFromPick?.[1]||anyLine?.[0]||NaN);
+    return Number.isFinite(line)&&Math.abs(line-criterion.line)<0.001;
+  }
+  if(criterion.type==="btts")return criterion.option==="Yes"?/^(yes|btts yes|both teams to score yes)$/.test(pick):/^(no|btts no|both teams to score no)$/.test(pick);
+  if(criterion.type==="1x2"){
+    if(criterion.option==="Home")return /^(home|home win|1|1x2 home)$/.test(pick)||/home/.test(pick);
+    if(criterion.option==="Draw")return /^(draw|tie|x|1x2 draw)$/.test(pick)||/\bdraw\b/.test(pick);
+    return /^(away|away win|2|1x2 away)$/.test(pick)||/away/.test(pick);
+  }
+  if(criterion.type==="double_chance"){
+    const normalized=pick.replace(/\s+/g,"").replace(/homeordraw|homedraw/g,"1x").replace(/draworaway|drawaway/g,"x2").replace(/homeoraway/g,"12");
+    return normalized===criterion.option.toLowerCase()||normalized.includes(criterion.option.toLowerCase());
+  }
+  if(criterion.type==="dnb")return criterion.option==="Home"?/^(home|home win|1)$/.test(pick)||/home/.test(pick):/^(away|away win|2)$/.test(pick)||/away/.test(pick);
+  return false;
+}
+async function selectAssistantFixtures(request,excludeEventIds=[]){
   const all=[];
+  const excluded=new Set((Array.isArray(excludeEventIds)?excludeEventIds:[]).map(String));
   for(const day of request.dates){
     const result=await getDayFixtures(day.date,false,"football");
     for(const fixture of result.fixtures||[]){
-      if(!fixture.eventId||!fixture.home||!fixture.away)continue;
+      if(!fixture.eventId||!fixture.home||!fixture.away||excluded.has(String(fixture.eventId)))continue;
       for(const market of fixture.markets||[]){
-        const name=String(market.marketName||"").toLowerCase();
-        if(!marketMatchesType(market,"ou")||/corner|card|booking|team total|first half|1st half|half time/.test(name))continue;
-        for(const outcome of market.outcomes||[]){
-          if(outcome.isActive===false||!Number.isFinite(Number(outcome.odds))||Number(outcome.odds)<=1)continue;
-          const outcomeName=String(outcome.outcomeName||"");
-          if(!new RegExp("\\b"+request.direction+"\\b","i").test(outcomeName))continue;
-          const specifierText=String(market.specifier||"");
-          const explicitLine=specifierText.match(/(?:total|goals?|line)\s*[=:]\s*(\d+(?:\.\d+)?)/i);
-          const outcomeLine=outcomeName.match(/\b(?:over|under)\s*(\d+(?:\.\d+)?)/i);
-          const anyLine=specifierText.match(/\d+(?:\.\d+)?/);
-          const actualLine=Number(explicitLine?.[1]||outcomeLine?.[1]||anyLine?.[0]||NaN);
-          if(!Number.isFinite(actualLine)||Math.abs(actualLine-request.line)>0.001)continue;
-          all.push({eventId:String(fixture.eventId),home:String(fixture.home),away:String(fixture.away),league:String(fixture.league||""),date:day.date,startTimeMs:Number(fixture.startTimeMs||0),pick:(request.direction==="over"?"Over ":"Under ")+request.line,marketId:String(market.marketId),specifier:market.specifier??null,outcomeId:String(outcome.outcomeId),odds:Number(outcome.odds),confidence:confidenceForOutcome(market,outcome),sport:"football"});
+        for(const criterion of request.criteria||[]){
+          if(!assistantMarketMatches(market,criterion))continue;
+          for(const outcome of market.outcomes||[]){
+            if(outcome.isActive===false||!Number.isFinite(Number(outcome.odds))||Number(outcome.odds)<=1)continue;
+            if(!assistantOutcomeMatches(market,outcome,criterion))continue;
+            const pick=criterion.type==="any"?String(outcome.outcomeName||market.marketName||"Selection"):criterion.label;
+            all.push({eventId:String(fixture.eventId),home:String(fixture.home),away:String(fixture.away),league:String(fixture.league||""),date:day.date,startTimeMs:Number(fixture.startTimeMs||0),pick,marketLabel:String(market.marketName||criterion.label),marketId:String(market.marketId),specifier:market.specifier??null,outcomeId:String(outcome.outcomeId),odds:Number(outcome.odds),confidence:confidenceForOutcome(market,outcome),sport:"football"});
+          }
         }
       }
     }
   }
   const unique=new Map();
   for(const row of all){
-    const key=row.eventId+"|"+row.date,previous=unique.get(key);
+    const key=[row.eventId,row.date,row.marketId,String(row.specifier||""),row.outcomeId].join("|");
+    const previous=unique.get(key);
     if(!previous||row.confidence>previous.confidence)unique.set(key,row);
   }
-  return [...unique.values()].sort((a,b)=>b.confidence-a.confidence||a.startTimeMs-b.startTimeMs).slice(0,request.requestedGames);
+  const ranked=[...unique.values()].sort((a,b)=>b.confidence-a.confidence||a.startTimeMs-b.startTimeMs);
+  const seen=new Set();
+  return ranked.filter(row=>{const key=row.eventId+"|"+row.date;if(seen.has(key))return false;seen.add(key);return true}).slice(0,request.requestedGames);
 }
+app.get("/api/assistant/conversations",requireAuth,async(req,res)=>{
+  try{res.json({ok:true,conversations:await listUserConversations(req.user.id)});}
+  catch(error){res.status(503).json({ok:false,error:"AI conversation history is temporarily unavailable."});}
+});
+app.get("/api/assistant/conversations/:id",requireAuth,async(req,res)=>{
+  try{
+    if(!/^[0-9a-f-]{36}$/i.test(String(req.params.id||"")))return res.status(400).json({ok:false,error:"Invalid conversation ID."});
+    const messages=await getUserConversation(req.user.id,req.params.id);
+    res.json({ok:true,messages});
+  }catch(error){res.status(503).json({ok:false,error:"AI conversation history is temporarily unavailable."});}
+});
+const aiChatRateLimits=new Map();
+function allowAiChatRequest(userId){
+  const now=Date.now(),windowMs=60_000,limit=10;
+  const prior=aiChatRateLimits.get(String(userId))||[];
+  const recent=prior.filter(t=>now-t<windowMs);
+  if(recent.length>=limit){aiChatRateLimits.set(String(userId),recent);return false;}
+  recent.push(now);aiChatRateLimits.set(String(userId),recent);
+  if(aiChatRateLimits.size>5000){for(const [id,times] of aiChatRateLimits)if(!times.some(t=>now-t<windowMs))aiChatRateLimits.delete(id);}
+  return true;
+}
+async function boundedAiContext(prompt){
+  let timer;
+  try{return await Promise.race([
+    verifiedAiContext(prompt),
+    new Promise(resolve=>{timer=setTimeout(()=>resolve("Live app data lookup timed out. Do not claim live data was checked."),4000)})
+  ])}finally{clearTimeout(timer)}
+}
+async function verifiedAiContext(prompt){
+  const q=String(prompt||"").toLowerCase();
+  if(!/(fixture|fixtures|match|matches|upcoming|today|tomorrow|odds|league|market|prediction|predictions|best pick|confidence|score)/.test(q))return "";
+  const sections=[];
+  const sport=/\b(basketball|nba|wnba)\b/.test(q)?"basketball":/table tennis|ping pong/.test(q)?"table_tennis":/\btennis\b/.test(q)?"tennis":/ice hockey|\bhockey\b|\bnhl\b/.test(q)?"ice_hockey":/\b(baseball|mlb)\b/.test(q)?"baseball":"football";
+  try{
+    const base=localDayKey(Date.now());
+    const dates=[];
+    const shift=(date,days)=>{const [y,m,d]=date.split("-").map(Number);return new Date(Date.UTC(y,m-1,d+days,12)).toISOString().slice(0,10)};
+    if(/\btomorrow\b/.test(q)&&!(/\btoday\b/.test(q)))dates.push(shift(base,1));
+    else dates.push(base);
+    if(/\btoday\b/.test(q)&&/\btomorrow\b/.test(q))dates.push(shift(base,1));
+    for(const date of [...new Set(dates)].slice(0,2)){
+      const result=await getDayFixtures(date,false,sport);
+      const rows=(result.fixtures||[]).filter(f=>f.home&&f.away).slice(0,10).map(f=>{
+        const markets=(f.markets||[]).slice(0,5).map(m=>{
+          const outcomes=(m.outcomes||[]).filter(o=>o.isActive!==false&&Number.isFinite(Number(o.odds))&&Number(o.odds)>1).slice(0,3).map(o=>String(o.outcomeName||"Outcome")+" @ "+Number(o.odds).toFixed(2));
+          return outcomes.length?String(m.marketName||"Market")+": "+outcomes.join(", "):"";
+        }).filter(Boolean).slice(0,3);
+        return "- "+f.home+" vs "+f.away+" | "+String(f.league||"League unavailable")+" | "+new Date(Number(f.startTimeMs)).toLocaleString("en-NG",{timeZone:"Africa/Lagos",hour:"2-digit",minute:"2-digit",day:"2-digit",month:"short"})+" Lagos time"+(markets.length?" | "+markets.join(" ; "):"");
+      });
+      sections.push("Real SportyBet "+sport+" fixture feed for "+date+" (Lagos date): "+(rows.length?rows.join("\n"):"No fixtures were returned for this date."));
+    }
+    if(/prediction|predictions|best pick|best games|recommend|confidence/.test(q)&&sport!=="table_tennis"){
+      const date=dates[0]||base;
+      const picks=await buildBestPicks(date,8,"all",sport);
+      const rows=(Array.isArray(picks)?picks:[]).slice(0,8).map(p=>"- "+p.home+" vs "+p.away+" | "+String(p.market||p.marketType||"Market")+" | "+String(p.pick||"Pick")+" | odds "+(Number.isFinite(Number(p.odds))?Number(p.odds).toFixed(2):"unavailable")+" | model confidence "+(Number.isFinite(Number(p.confidence))?Math.round(Number(p.confidence))+"%":"unavailable"));
+      sections.push("Current app prediction engine output for "+date+": "+(rows.length?rows.join("\n"):"No qualifying predictions were returned. Do not invent replacement picks."));
+    }
+  }catch(error){
+    sections.push("Live app data lookup failed for this request. Do not claim that live fixtures, odds, or predictions were checked; ask the user to use the app analyzer or try again.");
+    console.warn("AI live-context lookup failed:",String(error?.message||error).slice(0,200));
+  }
+  return sections.join("\n\n").slice(0,9000);
+}
+function userCanGenerateBookingCode(user){
+  return Boolean(user && (user.role==="admin" || (["pro","premium"].includes(user.plan) && ["active","none"].includes(user.subscriptionStatus))));
+}
+function isBookingCodeIntent(message){
+  const text=String(message||"");
+  const booking=/\b(generate|create|make|get|give(?:\s+me)?|build|prepare|produce)\b.{0,55}\b(booking\s*code|code|booking\s*slip)\b/i.test(text)
+    || /\bbooking\s*code\b.{0,40}\b(for|with|today|tomorrow|\d+\s*(?:games|matches|fixtures))\b/i.test(text);
+  const searchRequest=/\b\d{1,2}\s*(?:games?|matches|fixtures|selections|picks)\b/i.test(text)
+    && /\b(btts|both teams|over|under|1x2|double chance|draw no bet|dnb|corners?|cards?|best(?:\s+\d{1,2})?\s+games|any options?|any market|mixed markets|mix options)\b/i.test(text);
+  return booking||searchRequest;
+}
+function normalizedBookingPrompt(message){
+  let prompt=String(message||"").trim();
+  if(!/sportybet/i.test(prompt))prompt+=" for SportyBet";
+  if(!/football|soccer|basketball|tennis|table tennis|ice hockey|baseball/i.test(prompt))prompt+=" football";
+  return prompt;
+}
+app.post("/api/assistant/chat",requireAuth,async(req,res)=>{
+  try{
+    const chatMessage=String(req.body?.message||"").trim();
+    if(!chatMessage)return res.status(400).json({ok:false,error:"Type a message first."});
+    if(chatMessage.length>2000)return res.status(400).json({ok:false,error:"Keep each message under 2,000 characters."});
+    if(!allowAiChatRequest(req.user.id))return res.status(429).json({ok:false,error:"AI chat rate limit reached. Please wait a minute and try again."});
+    if(isBookingCodeIntent(chatMessage)){
+      const access=await getAccessSettings();
+      if(access.subscriptionEnabled!==false&&!userCanGenerateBookingCode(req.user)){
+        return res.status(402).json({ok:false,code:"PAID_REQUIRED",error:"An active paid plan is required to select fixtures and generate booking codes."});
+      }
+      let request;
+      try{request=parseBookingAssistantPrompt(normalizedBookingPrompt(chatMessage));}
+      catch(error){
+        const reply=error.message+" Tell me the number of games and date if you have not already. Example: Find 20 football games for BTTS Yes today.";
+        const conversationId=await saveAssistantExchange({userId:req.user.id,conversationId:req.body?.conversationId,message:chatMessage,reply});
+        return res.json({ok:true,conversationId,reply,provider:"booking-assistant",bookingPreview:null});
+      }
+      const selections=await selectAssistantFixtures(request,req.body?.excludeEventIds);
+      const reply=selections.length
+        ? "Found "+selections.length+" qualified "+request.marketLabel+" selections for "+request.dates.map(d=>d.label.toLowerCase()).join(", ")+". Would you like me to generate the booking code, look for more, or mix in another market?"
+        : "I couldn't find qualified "+request.marketLabel+" selections for "+request.dates.map(d=>d.label.toLowerCase()).join(", ")+". I won't substitute another market. Would you like to try another date or change the option?";
+      const conversationId=await saveAssistantExchange({userId:req.user.id,conversationId:req.body?.conversationId,message:chatMessage,reply});
+      const bookingPreview=selections.length?{
+        request:{requestedGames:request.requestedGames,sport:request.sport,bookmaker:request.bookmaker,criteria:request.criteria,marketLabel:request.marketLabel,dates:request.dates.map(d=>d.date),dateLabels:request.dates.map(d=>d.label)},
+        selections,
+        warnings:selections.length<request.requestedGames?["Only "+selections.length+" distinct fixtures currently have active matching markets. No filler selections were added."]:[],
+        message:reply
+      }:null;
+      return res.json({ok:true,conversationId,reply,provider:"booking-assistant",bookingPreview});
+    }
+    const context=await boundedAiContext(chatMessage);
+    const result=await chatForUser({userId:req.user.id,conversationId:req.body?.conversationId,message:chatMessage,context});
+    res.json({ok:true,...result});
+  }catch(error){
+    // Log sanitized provider failure details only; never log prompts or credentials.
+    if(error.code==="AI_PROVIDERS_UNAVAILABLE"){
+      console.error("AI assistant providers unavailable",JSON.stringify((error.providerErrors||[]).map(item=>({provider:item.provider,error:String(item.error||"failed").slice(0,180)}))));
+      return res.status(503).json({ok:false,code:error.code,error:error.message});
+    }
+    console.error("AI assistant chat request failed",String(error?.message||"unknown error").slice(0,240));
+    const status=/Type a message|under 2,000|Invalid conversation ID|Conversation not found/.test(error.message||"")?400:503;
+    res.status(status).json({ok:false,error:status===400?error.message:"The AI assistant is temporarily unavailable. Your message has not produced a reply; try again shortly."});
+  }
+});
+
+app.post("/api/assistant/booking-code",requireAuth,requirePaid,async(req,res)=>{
+  try{
+    if(!(await getAdminSettings()).bookingCodeEnabled)return res.status(503).json({ok:false,error:"Booking-code generation is temporarily disabled by the administrator."});
+    const selections=Array.isArray(req.body?.selections)?req.body.selections:[];
+    if(!selections.length)return res.status(400).json({ok:false,error:"No reviewed selections were provided."});
+    if(selections.length>50)return res.status(400).json({ok:false,error:"A booking slip can contain at most 50 selections."});
+    const result=await generateTargetBooking("sportybet",selections,"football");
+    const code=String(result.bookingCode||"");
+    const shareURL=result.shareURL?String(result.shareURL):"";
+    const reply="SportyBet returned booking code: "+code+". The app rechecked the selected markets before requesting it. Review the shared slip and current odds on SportyBet before placing any bet."+(shareURL?" Shared slip: "+shareURL:"");
+    const conversationId=await saveAssistantExchange({userId:req.user.id,conversationId:req.body?.conversationId,message:"Generate a booking code for the reviewed selections.",reply,provider:"sportybet"});
+    res.json({ok:true,conversationId,bookingCode:code,shareURL:shareURL||null,availableSelections:result.availableSelections||[],unavailableSelections:result.unavailableSelections||[],reply});
+  }catch(error){
+    const status=error.code==="NO_AVAILABLE_SELECTIONS"?409:502;
+    res.status(status).json({ok:false,error:error.message||"SportyBet could not create a booking code.",unavailableSelections:error.unavailable||[]});
+  }
+});
 app.post("/api/assistant/booking-request",requirePaid,async(req,res)=>{
   try{
-    const request=parseAssistantBookingPrompt(req.body?.prompt);
+    const request=parseBookingAssistantPrompt(req.body?.prompt);
     const selections=await selectAssistantFixtures(request);
     const warnings=[];
     if(selections.length<request.requestedGames)warnings.push("Only "+selections.length+" distinct fixtures currently have an active matching "+request.marketLabel+" market across the requested dates. No filler selections were added.");
