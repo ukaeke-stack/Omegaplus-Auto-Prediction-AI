@@ -84,10 +84,10 @@ function listen(){
  if(!SR){status("Voice input is not supported by this browser. Type your message instead.");return}
  const rec=new SR();rec.lang="en-NG";rec.interimResults=false;rec.maxAlternatives=1;
  const btn=$("#aiChatMic");btn.disabled=true;btn.textContent="Listening…";
- rec.onresult=e=>{const input=$("#aiChatInput");if(input)input.value=(input.value?input.value+" ":"")+e.results[0][0].transcript;input?.focus();status("Voice captured. Review your message, then send it.")};
+ rec.onresult=e=>{const input=$("#aiChatInput"),transcript=String(e.results?.[0]?.[0]?.transcript||"").trim();if(!input||!transcript){status("I could not hear a clear message. Please try again or type it.");return}input.value=(input.value?input.value+" ":"")+transcript;input.focus();status("Voice captured. Sending your message…");sendMessage()};
  rec.onerror=e=>status(e.error==="not-allowed"?"Microphone permission was denied. Allow microphone access or type your message.":"Voice input failed. Type your message instead.");
  rec.onend=()=>{btn.disabled=false;btn.textContent="Speak"};
- try{rec.start()}catch{btn.disabled=false;btn.textContent="Speak";status("Could not start microphone input.")}
+ try{rec.start()}catch{btn.disabled=false;btn.textContent="Speak";status("Could not start microphone input. Check browser microphone permission and try again.")}
 }
 function init(){
  const page=$("#page-voice-assistant"),intro=page?.querySelector(".page-title > p");
