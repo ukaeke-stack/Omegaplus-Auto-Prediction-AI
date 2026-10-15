@@ -14,7 +14,7 @@ function appendBookingPreview(preview){
  const box=$("#aiChatMessages");if(!box||!preview)return;
  pendingBooking=preview;
  const request=preview.request||{},selections=Array.isArray(preview.selections)?preview.selections:[];
- const html='<article class="ai-chat-booking-preview"><div class="ai-chat-booking-heading"><strong>Booking slip review</strong><span>'+selections.length+' selected</span></div><p>'+esc(request.marketLabel||"Football goal market")+' · '+esc((request.dateLabels||[]).join(", "))+'</p><div class="ai-chat-booking-list">'+selections.map((s,i)=>'<div class="ai-chat-booking-row"><b>'+String(i+1).padStart(2,"0")+'. '+esc(s.home)+' vs '+esc(s.away)+'</b><small>'+esc(s.league||"League unavailable")+' · '+esc(s.date||"Date unavailable")+' · '+esc(s.pick||"Selection")+' · Odds '+esc(Number(s.odds)>1?Number(s.odds).toFixed(2):"unavailable")+'</small></div>').join("")+'</div>'+(preview.warnings||[]).map(w=>'<p class="ai-chat-booking-warning">'+esc(w)+'</p>').join("")+'<p class="ai-chat-booking-warning">Review the fixtures and odds. Pressing this button asks SportyBet for a code; it does not place a bet.</p><button type="button" class="primary" id="aiChatGenerateCode">Generate booking code</button><div id="aiChatBookingStatus" role="status"></div></article>';
+ const html='<article class="ai-chat-booking-preview"><div class="ai-chat-booking-heading"><strong>Booking slip review</strong><span>'+selections.length+' qualified</span></div><p>'+esc(request.marketLabel||"Requested market")+' · '+esc((request.dateLabels||[]).join(", "))+'</p><details class="ai-chat-booking-details"><summary>Review '+selections.length+' selected fixtures</summary><div class="ai-chat-booking-list">'+selections.map((s,i)=>'<div class="ai-chat-booking-row"><b>'+String(i+1).padStart(2,"0")+'. '+esc(s.home)+' vs '+esc(s.away)+'</b><small>'+esc(s.league||"League unavailable")+' · '+esc(s.date||"Date unavailable")+' · '+esc(s.pick||"Selection")+' · Odds '+esc(Number(s.odds)>1?Number(s.odds).toFixed(2):"unavailable")+'</small></div>').join("")+'</div></details>'+(preview.warnings||[]).map(w=>'<p class="ai-chat-booking-warning">'+esc(w)+'</p>').join("")+'<p class="ai-chat-booking-warning">You can ask me to find more or add another market. I will not change your requested option unless you ask.</p><button type="button" class="primary" id="aiChatGenerateCode">Generate booking code</button><div id="aiChatBookingStatus" role="status"></div></article>';
  box.insertAdjacentHTML("beforeend",html);
  $("#aiChatGenerateCode").addEventListener("click",generateChatBookingCode);
  scrollBottom();
@@ -60,6 +60,14 @@ async function sendMessage(){
  const input=$("#aiChatInput"),message=String(input?.value||"").trim();
  if(!message){status("Type a message first.");return}
  if(message.length>2000){status("Keep each message under 2,000 characters.");return}
+ if(pendingBooking&&/\\b(generate|create|make|get|give)\\b.{0,35}\\b(booking\\s*code|code)\\b/i.test(message)){
+   input.value="";
+   const box=$("#aiChatMessages");
+   if(box)box.insertAdjacentHTML("beforeend",'<article class="ai-chat-message user"><small>YOU</small><div>'+esc(message)+'</div></article>');
+   scrollBottom();
+   await generateChatBookingCode();
+   return;
+ }
  busy=true;$("#aiChatSend").disabled=true;$("#aiChatMic").disabled=true;$("#aiChatNew").disabled=true;
  const box=$("#aiChatMessages");
  if(box&&box.querySelector(".ai-chat-empty"))box.innerHTML="";
@@ -82,12 +90,15 @@ async function sendMessage(){
 function listen(){
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){status("Voice input is not supported by this browser. Type your message instead.");return}
- const rec=new SR();rec.lang="en-NG";rec.interimResults=false;rec.maxAlternatives=1;
+ const rec=new SR();rec.lang="en-NG";rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;
  const btn=$("#aiChatMic");btn.disabled=true;btn.textContent="Listening…";
- rec.onresult=e=>{const input=$("#aiChatInput"),transcript=String(e.results?.[0]?.[0]?.transcript||"").trim();if(!input||!transcript){status("I could not hear a clear message. Please try again or type it.");return}input.value=(input.value?input.value+" ":"")+transcript;input.focus();status("Voice captured. Sending your message…");sendMessage()};
- rec.onerror=e=>status(e.error==="not-allowed"?"Microphone permission was denied. Allow microphone access or type your message.":"Voice input failed. Type your message instead.");
- rec.onend=()=>{btn.disabled=false;btn.textContent="Speak"};
- try{rec.start()}catch{btn.disabled=false;btn.textContent="Speak";status("Could not start microphone input. Check browser microphone permission and try again.")}
+ let transcript="",silenceTimer=null,submitted=false;
+ const finish=()=>{if(submitted)return;submitted=true;clearTimeout(silenceTimer);try{rec.stop()}catch{};const text=transcript.trim();if(!text){status("I didn't catch a complete message. Please speak again or type it.");return}
+ const input=$("#aiChatInput");if(!input)return;input.value=(input.value?input.value+" ":"")+text;input.focus();status("You’ve finished speaking. Sending your message…");sendMessage()};
+ rec.onresult=e=>{let combined="";for(let i=0;i<e.results.length;i++){const result=e.results[i];if(result&&result[0])combined+=result[0].transcript+" "}transcript=combined.trim();clearTimeout(silenceTimer);silenceTimer=setTimeout(finish,2200)};
+ rec.onerror=e=>{clearTimeout(silenceTimer);status(e.error==="not-allowed"?"Microphone permission was denied. Allow microphone access or type your message.":"Voice input failed. Type your message instead.")};
+ rec.onend=()=>{clearTimeout(silenceTimer);btn.disabled=false;btn.textContent="Speak";if(!submitted&&transcript.trim())finish()};
+ try{rec.start();status("Listening. I’ll wait for about two seconds of silence before sending your message.")}catch{btn.disabled=false;btn.textContent="Speak";status("Could not start microphone input. Check browser microphone permission and try again.")}
 }
 function init(){
  const page=$("#page-voice-assistant"),intro=page?.querySelector(".page-title > p");
