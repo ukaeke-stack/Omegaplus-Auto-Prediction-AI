@@ -1617,7 +1617,7 @@ function isBookingCodeIntent(message){
   const text=String(message||"");
   const booking=/\b(generate|create|make|get|give(?:\s+me)?|build|prepare|produce)\b.{0,55}\b(booking\s*code|code|booking\s*slip)\b/i.test(text)
     || /\bbooking\s*code\b.{0,40}\b(for|with|today|tomorrow|\d+\s*(?:games|matches|fixtures))\b/i.test(text);
-  const searchRequest=/\b(find|look for|search for|build|select|pick|give(?:\s+me)?|show(?:\s+me)?|get(?:\s+me)?)\b.{0,55}\b\d{1,2}\s*(?:games?|matches|fixtures|selections|picks)\b/i.test(text)
+  const searchRequest=/\b\d{1,2}\s*(?:games?|matches|fixtures|selections|picks)\b/i.test(text)
     && /\b(btts|both teams|over|under|1x2|double chance|draw no bet|dnb|corners?|cards?|best(?:\s+\d{1,2})?\s+games|any options?|any market|mixed markets|mix options)\b/i.test(text);
   return booking||searchRequest;
 }
