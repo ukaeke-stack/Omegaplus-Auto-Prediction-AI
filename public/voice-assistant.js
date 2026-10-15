@@ -1,7 +1,7 @@
 (()=>{"use strict";
 const $=s=>document.querySelector(s),esc=v=>String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let lastRequest=null,lastSelections=[],conversationId=null;
-async function api(url,options={}){const r=await fetch(url,{credentials:"same-origin",...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||"Assistant request failed.");return d}
+async function api(url,options={}){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);try{const r=await fetch(url,{credentials:"same-origin",...options,signal:controller.signal,headers:{"Content-Type":"application/json",...(options.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||(r.status===401?"Please log in before using the assistant.":"Assistant request failed (HTTP "+r.status+")."));return d}catch(error){if(error.name==="AbortError")throw new Error("The assistant took too long to respond. Please try again.");throw error}finally{clearTimeout(timer)}}
 function say(text){const SR=window.SpeechSynthesisUtterance;if(!SR)return;try{speechSynthesis.cancel();speechSynthesis.speak(new SR(text))}catch{}}
 function setStatus(text){const el=$("#assistantStatus");if(el)el.textContent=text}
 function drawSlipImage(code){
@@ -28,23 +28,34 @@ function render(d){
  $("#assistantGenerateCode").onclick=generateCode;
  setStatus(d.message||"Selections ready for review.");
 }
-async function submitPrompt(){
- const input=$("#assistantPrompt"),prompt=String(input?.value||"").trim();if(!prompt){setStatus("Type or say what you want help with.");return}
- const btn=$("#assistantSubmit");if(btn)btn.disabled=true;setStatus("Sending your request to Omegaplus AI…");$("#assistantResults").innerHTML="";
+function showHomeStatus(text){const host=$(".assistant-home-launch");if(!host)return;let status=$("#assistantHomeStatus");if(!status){status=document.createElement("div");status.id="assistantHomeStatus";status.className="analysis-status";status.setAttribute("role","status");status.setAttribute("aria-live","polite");host.appendChild(status)}status.textContent=text;return status}
+function showHomeReply(text,isError=false){const host=$(".assistant-home-launch");if(!host)return;let reply=$("#assistantHomeReply");if(!reply){reply=document.createElement("div");reply.id="assistantHomeReply";reply.className="assistant-result-summary";host.appendChild(reply)}reply.hidden=false;reply.textContent=text;reply.style.whiteSpace="pre-wrap";reply.style.overflowWrap="anywhere";reply.style.borderLeft=isError?"3px solid #ef4444":"3px solid #18e76b";reply.style.padding="10px 12px";return reply}
+function openAssistantPage(){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active-page"));$("#page-voice-assistant")?.classList.add("active-page");document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page==="voice-assistant"))}
+async function submitPrompt(options={}){
+ const home=Boolean(options.home),input=$("#assistantPrompt"),prompt=String(options.prompt??input?.value??"").trim();
+ if(!prompt){if(home)showHomeStatus("Type or say what you want help with.");else setStatus("Type or say what you want help with.");return}
+ if(input&&options.prompt!==undefined)input.value=prompt;
+ const btn=$("#assistantSubmit");if(btn)btn.disabled=true;
+ if(home)showHomeStatus("Sending your request to Omegaplus AI…");else setStatus("Sending your request to Omegaplus AI…");
+ const results=$("#assistantResults");if(results)results.innerHTML="";
  try{
   const d=await api("/api/assistant/chat",{method:"POST",body:JSON.stringify({message:prompt,conversationId})});
   conversationId=d.conversationId||conversationId;
   if(d.bookingPreview){
+   openAssistantPage();
    const preview=d.bookingPreview;
    render({request:preview.request,selections:preview.selections||[],warnings:preview.warnings||[],message:d.reply});
-  }else{
-   const box=$("#assistantResults");
-   if(box)box.innerHTML='<article class="assistant-fixture assistant-conversation-reply"><div><b>OMEGAPLUS AI</b><p>'+esc(d.reply||"I received your message, but no reply was returned. Please try again.")+'</p></div></article>';
-   setStatus("Answered by "+String(d.provider||"Omegaplus AI")+(d.fallbackUsed?" after a provider fallback.":"."));
-   if(d.reply)say(d.reply);
+   return;
   }
- }catch(e){setStatus(e.message);say(e.message)}
- finally{if(btn)btn.disabled=false}
+  const reply=String(d.reply||"I received your message, but no reply was returned. Please try again.");
+  if(home){showHomeReply(reply);showHomeStatus("Answered by "+String(d.provider||"Omegaplus AI")+(d.fallbackUsed?" after a provider fallback.":"."));}
+  else{if(results)results.innerHTML='<article class="assistant-fixture assistant-conversation-reply"><div><b>OMEGAPLUS AI</b><p>'+esc(reply)+'</p></div></article>';setStatus("Answered by "+String(d.provider||"Omegaplus AI")+(d.fallbackUsed?" after a provider fallback.":"."));}
+  say(reply);
+ }catch(e){
+  if(home){showHomeStatus("Assistant request failed.");showHomeReply(e.message||"The assistant could not respond. Please try again.",true);}
+  else{setStatus(e.message||"The assistant could not respond. Please try again.");if(results)results.innerHTML='<article class="assistant-fixture assistant-conversation-reply"><div><b>ASSISTANT ERROR</b><p>'+esc(e.message||"The assistant could not respond. Please try again.")+'</p></div></article>';}
+  say(e.message||"The assistant could not respond. Please try again.");
+ }finally{if(btn)btn.disabled=false}
 }
 async function generateCode(){
  const btn=$("#assistantGenerateCode"),status=$("#assistantBookingStatus");btn.disabled=true;status.textContent="Checking current SportyBet markets and requesting a booking code…";
@@ -63,7 +74,7 @@ function voice(promptSelector="#assistantPrompt",buttonSelector="#assistantMic")
  if(!SR){setStatus("Voice input is not supported by this browser. You can type the request instead.");return}
  const rec=new SR();rec.lang="en-NG";rec.interimResults=false;rec.maxAlternatives=1;
  const b=$(buttonSelector);if(!b)return;b.disabled=true;b.textContent="Listening…";
- rec.onresult=e=>{const input=$(promptSelector),transcript=String(e.results?.[0]?.[0]?.transcript||"").trim();if(!input||!transcript){setStatus("I could not hear a clear request. Please try again or type it.");return}input.value=transcript;setStatus("Voice request captured. Sending it to Omegaplus AI…");if(promptSelector==="#assistantPromptHome"){const main=$("#assistantPrompt");if(main)main.value=transcript;document.querySelectorAll(".page").forEach(p=>p.classList.remove("active-page"));$("#page-voice-assistant")?.classList.add("active-page");document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page==="voice-assistant"));submitPrompt()}else{submitPrompt()}};
+ rec.onresult=e=>{const input=$(promptSelector),transcript=String(e.results?.[0]?.[0]?.transcript||"").trim();if(!input||!transcript){setStatus("I could not hear a clear request. Please try again or type it.");return}input.value=transcript;if(promptSelector==="#assistantPromptHome"){showHomeStatus("Voice captured. Sending your request to Omegaplus AI…");submitPrompt({prompt:transcript,home:true})}else{setStatus("Voice captured. Sending your request to Omegaplus AI…");submitPrompt({prompt:transcript})}};
  rec.onerror=e=>setStatus(e.error==="not-allowed"?"Microphone permission was denied. Allow microphone access or type your request.":"Voice input failed. You can type the request instead.");
  rec.onend=()=>{b.disabled=false;b.textContent="🎙 Speak";};
  try{rec.start()}catch(error){b.disabled=false;b.textContent="🎙 Speak";setStatus("Could not start microphone input. Check browser microphone permission and try again.");}
@@ -76,7 +87,7 @@ function init(){
  $("#assistantPrompt")?.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();submitPrompt()}});
  $("#assistantMic")?.addEventListener("click",()=>voice("#assistantPrompt","#assistantMic"));
  $("#assistantMicHome")?.addEventListener("click",()=>voice("#assistantPromptHome","#assistantMicHome"));
- $("#assistantLaunch")?.addEventListener("click",()=>{const home=$("#assistantPromptHome"),input=$("#assistantPrompt");if(input&&home)input.value=home.value;document.querySelectorAll(".page").forEach(p=>p.classList.remove("active-page"));$("#page-voice-assistant")?.classList.add("active-page");document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page==="voice-assistant"));$("#assistantSubmit")?.click()});
+ $("#assistantLaunch")?.addEventListener("click",()=>{const home=$("#assistantPromptHome");submitPrompt({prompt:home?.value||"",home:true})});
  $("#assistantPromptHome")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("#assistantLaunch")?.click()}});
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
