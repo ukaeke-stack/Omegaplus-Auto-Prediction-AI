@@ -1517,12 +1517,13 @@ function assistantOutcomeMatches(market,outcome,criterion){
   if(criterion.type==="dnb")return criterion.option==="Home"?/^(home|home win|1)$/.test(pick)||/home/.test(pick):/^(away|away win|2)$/.test(pick)||/away/.test(pick);
   return false;
 }
-async function selectAssistantFixtures(request){
+async function selectAssistantFixtures(request,excludeEventIds=[]){
   const all=[];
+  const excluded=new Set((Array.isArray(excludeEventIds)?excludeEventIds:[]).map(String));
   for(const day of request.dates){
     const result=await getDayFixtures(day.date,false,"football");
     for(const fixture of result.fixtures||[]){
-      if(!fixture.eventId||!fixture.home||!fixture.away)continue;
+      if(!fixture.eventId||!fixture.home||!fixture.away||excluded.has(String(fixture.eventId)))continue;
       for(const market of fixture.markets||[]){
         for(const criterion of request.criteria||[]){
           if(!assistantMarketMatches(market,criterion))continue;
@@ -1644,13 +1645,13 @@ app.post("/api/assistant/chat",requireAuth,async(req,res)=>{
         const conversationId=await saveAssistantExchange({userId:req.user.id,conversationId:req.body?.conversationId,message:chatMessage,reply});
         return res.json({ok:true,conversationId,reply,provider:"booking-assistant",bookingPreview:null});
       }
-      const selections=await selectAssistantFixtures(request);
+      const selections=await selectAssistantFixtures(request,req.body?.excludeEventIds);
       const reply=selections.length
         ? "Found "+selections.length+" qualified "+request.marketLabel+" selections for "+request.dates.map(d=>d.label.toLowerCase()).join(", ")+". Would you like me to generate the booking code, look for more, or mix in another market?"
         : "I couldn't find qualified "+request.marketLabel+" selections for "+request.dates.map(d=>d.label.toLowerCase()).join(", ")+". I won't substitute another market. Would you like to try another date or change the option?";
       const conversationId=await saveAssistantExchange({userId:req.user.id,conversationId:req.body?.conversationId,message:chatMessage,reply});
       const bookingPreview=selections.length?{
-        request:{requestedGames:request.requestedGames,sport:request.sport,bookmaker:request.bookmaker,direction:request.direction,line:request.line,marketLabel:request.marketLabel,dates:request.dates.map(d=>d.date),dateLabels:request.dates.map(d=>d.label)},
+        request:{requestedGames:request.requestedGames,sport:request.sport,bookmaker:request.bookmaker,criteria:request.criteria,marketLabel:request.marketLabel,dates:request.dates.map(d=>d.date),dateLabels:request.dates.map(d=>d.label)},
         selections,
         warnings:selections.length<request.requestedGames?["Only "+selections.length+" distinct fixtures currently have active matching markets. No filler selections were added."]:[],
         message:reply
