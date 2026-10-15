@@ -59,5 +59,5 @@ export function parseBookingAssistantPrompt(prompt,today=lagosDateKey()){
   if(mentionsDayAfter)offsets.add(2);
   if(!offsets.size)offsets.add(0);
   const dates=[...offsets].sort((a,b)=>a-b).map(offset=>({offset,date:shiftDateKey(today,offset),label:offset===0?"Today":offset===1?"Tomorrow":"Day after tomorrow"}));
-  return {requestedGames,sport:"football",bookmaker:"SportyBet",criteria,marketLabel:criteria.map(c=>c.label).join(" + "),dates};
+  return {requestedGames,sport:"football",bookmaker:"SportyBet",criteria,direction:criteria.length===1?criteria[0].direction:undefined,line:criteria.length===1?criteria[0].line:undefined,marketLabel:criteria.map(c=>c.label).join(" + "),dates};
 }
