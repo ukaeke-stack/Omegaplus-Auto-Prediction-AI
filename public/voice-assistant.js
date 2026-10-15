@@ -1,6 +1,6 @@
 (()=>{"use strict";
 const $=s=>document.querySelector(s),esc=v=>String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let lastRequest=null,lastSelections=[];
+let lastRequest=null,lastSelections=[],conversationId=null;
 async function api(url,options={}){const r=await fetch(url,{credentials:"same-origin",...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||"Assistant request failed.");return d}
 function say(text){const SR=window.SpeechSynthesisUtterance;if(!SR)return;try{speechSynthesis.cancel();speechSynthesis.speak(new SR(text))}catch{}}
 function setStatus(text){const el=$("#assistantStatus");if(el)el.textContent=text}
@@ -29,11 +29,22 @@ function render(d){
  setStatus(d.message||"Selections ready for review.");
 }
 async function submitPrompt(){
- const input=$("#assistantPrompt"),prompt=String(input?.value||"").trim();if(!prompt){setStatus("Type or say what you want to build.");return}
- const btn=$("#assistantSubmit");btn.disabled=true;setStatus("Understanding your request and checking available fixtures…");$("#assistantResults").innerHTML="";
- try{const d=await api("/api/assistant/booking-request",{method:"POST",body:JSON.stringify({prompt})});render(d)}
- catch(e){setStatus(e.message);say(e.message)}
- finally{btn.disabled=false}
+ const input=$("#assistantPrompt"),prompt=String(input?.value||"").trim();if(!prompt){setStatus("Type or say what you want help with.");return}
+ const btn=$("#assistantSubmit");if(btn)btn.disabled=true;setStatus("Sending your request to Omegaplus AI…");$("#assistantResults").innerHTML="";
+ try{
+  const d=await api("/api/assistant/chat",{method:"POST",body:JSON.stringify({message:prompt,conversationId})});
+  conversationId=d.conversationId||conversationId;
+  if(d.bookingPreview){
+   const preview=d.bookingPreview;
+   render({request:preview.request,selections:preview.selections||[],warnings:preview.warnings||[],message:d.reply});
+  }else{
+   const box=$("#assistantResults");
+   if(box)box.innerHTML='<article class="assistant-fixture assistant-conversation-reply"><div><b>OMEGAPLUS AI</b><p>'+esc(d.reply||"I received your message, but no reply was returned. Please try again.")+'</p></div></article>';
+   setStatus("Answered by "+String(d.provider||"Omegaplus AI")+(d.fallbackUsed?" after a provider fallback.":"."));
+   if(d.reply)say(d.reply);
+  }
+ }catch(e){setStatus(e.message);say(e.message)}
+ finally{if(btn)btn.disabled=false}
 }
 async function generateCode(){
  const btn=$("#assistantGenerateCode"),status=$("#assistantBookingStatus");btn.disabled=true;status.textContent="Checking current SportyBet markets and requesting a booking code…";
