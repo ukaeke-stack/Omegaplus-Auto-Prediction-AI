@@ -50,7 +50,9 @@ export function parseBookingAssistantPrompt(prompt,today=lagosDateKey()){
   const requestedGames=countMatch?Number(countMatch[1]):1;
   if(requestedGames<1||requestedGames>50)throw new Error("Request between 1 and 50 games.");
   const criteria=parseCriteria(text);
-  const mentionsToday=/\btoday\b/i.test(text),mentionsTomorrow=/\btomorrow\b/i.test(text),mentionsDayAfter=/day\s+after\s+tomorrow|next\s+tomorrow|tomorrow\s+after\s+tomorrow/i.test(text);
+  const mentionsDayAfter=/day\s+after\s+tomorrow|next\s+tomorrow|tomorrow\s+after\s+tomorrow/i.test(text);
+  const dateText=text.replace(/day\s+after\s+tomorrow|next\s+tomorrow|tomorrow\s+after\s+tomorrow/gi,"");
+  const mentionsToday=/\btoday\b/i.test(dateText),mentionsTomorrow=/\btomorrow\b/i.test(dateText);
   const offsets=new Set();
   if(mentionsToday)offsets.add(0);
   if(mentionsTomorrow)offsets.add(1);
