@@ -13,6 +13,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
@@ -22,6 +23,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import java.util.Locale;
+import org.json.JSONObject;
 
 public class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST=4101,AUDIO_PERMISSION_REQUEST=4102;
@@ -31,29 +33,47 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> pendingFileChooser;
     private PermissionRequest pendingWebPermission;
     private TextToSpeech textToSpeech;
-    private boolean ttsReady=false;
+    private volatile boolean ttsReady=false;
+    private volatile boolean ttsInitializationComplete=false;
     private String pendingSpeechText="";
+    private String pendingSpeechSource="default";
+    private String currentSpeechText="";
+    private String currentSpeechSource="default";
 
     public class AppBridge {
         @JavascriptInterface public String getVersionName(){try{PackageInfo i=getPackageManager().getPackageInfo(getPackageName(),0);return i.versionName!=null?i.versionName:"";}catch(Exception e){return "";}}
         @JavascriptInterface public int getVersionCode(){try{PackageInfo i=getPackageManager().getPackageInfo(getPackageName(),0);if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.P)return (int)i.getLongVersionCode();return i.versionCode;}catch(Exception e){return 0;}}
         @JavascriptInterface public void openPlayStore(){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id="+getPackageName())));}catch(Exception e){startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/apps/details?id="+getPackageName())));}}
-        @JavascriptInterface public void speakText(String text){
-            final String value=text==null?"":text.trim();if(value.isEmpty())return;
+        @JavascriptInterface public String getSpeechStatus(){return !ttsInitializationComplete?"initializing":ttsReady?"ready":"unavailable";}
+        @JavascriptInterface public void speakText(String text){queueSpeech(text,"default");}
+        @JavascriptInterface public void speakTextFor(String text,String source){queueSpeech(text,source);}
+        private void queueSpeech(String text,String source){
+            final String value=text==null?"":text.trim();final String origin=source==null||source.trim().isEmpty()?"default":source.trim();
+            if(value.isEmpty())return;
             runOnUiThread(()->{
-                if(textToSpeech==null||!ttsReady){pendingSpeechText=value;return;}
-                speakNow(value);
+                if(ttsInitializationComplete&&!ttsReady){dispatchSpeechFallback(value,origin);return;}
+                if(textToSpeech==null||!ttsReady){pendingSpeechText=value;pendingSpeechSource=origin;return;}
+                speakNow(value,origin);
             });
         }
         @JavascriptInterface public void requestNotificationPermission(){runOnUiThread(()->{if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},4103);});}
         @JavascriptInterface public void showNotification(String title,String body){runOnUiThread(()->showNativeNotification(title,body));}
     }
 
-    private void speakNow(String value){
+    private void speakNow(String value,String source){
         if(textToSpeech==null||!ttsReady||value==null||value.trim().isEmpty())return;
+        currentSpeechText=value;currentSpeechSource=source==null?"default":source;
         textToSpeech.setLanguage(Locale.UK);
-        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP)textToSpeech.speak(value,TextToSpeech.QUEUE_FLUSH,null,"omega-ai-reply");
-        else textToSpeech.speak(value,TextToSpeech.QUEUE_FLUSH,null);
+        int result;
+        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.LOLLIPOP)result=textToSpeech.speak(value,TextToSpeech.QUEUE_FLUSH,null,"omega-ai-reply");
+        else result=textToSpeech.speak(value,TextToSpeech.QUEUE_FLUSH,null);
+        if(result==TextToSpeech.ERROR)dispatchSpeechFallback(value,currentSpeechSource);
+    }
+
+    private void dispatchSpeechFallback(String value,String source){
+        if(webView==null||value==null||value.trim().isEmpty())return;
+        String detail="{\"text\":"+JSONObject.quote(value)+",\"source\":"+JSONObject.quote(source==null?"default":source)+"}";
+        webView.post(()->webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('omega-native-speech-fallback',{detail:"+detail+"}));",null));
     }
 
     private void showNativeNotification(String title,String body){
@@ -69,12 +89,24 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
         textToSpeech=new TextToSpeech(this,status->{
+            ttsInitializationComplete=true;
             ttsReady=status==TextToSpeech.SUCCESS;
             if(ttsReady){
                 textToSpeech.setLanguage(Locale.UK);
-                String queued=pendingSpeechText;
-                pendingSpeechText="";
-                if(!queued.isEmpty())speakNow(queued);
+                textToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener(){
+                    @Override public void onStart(String utteranceId){}
+                    @Override public void onDone(String utteranceId){}
+                    @Override public void onError(String utteranceId){
+                        if("omega-ai-reply".equals(utteranceId))runOnUiThread(()->dispatchSpeechFallback(currentSpeechText,currentSpeechSource));
+                    }
+                });
+                String queued=pendingSpeechText,source=pendingSpeechSource;
+                pendingSpeechText="";pendingSpeechSource="default";
+                if(!queued.isEmpty())speakNow(queued,source);
+            }else{
+                String queued=pendingSpeechText,source=pendingSpeechSource;
+                pendingSpeechText="";pendingSpeechSource="default";
+                if(!queued.isEmpty())dispatchSpeechFallback(queued,source);
             }
         });
         webView=new WebView(this);webView.setWebViewClient(new WebViewClient());
