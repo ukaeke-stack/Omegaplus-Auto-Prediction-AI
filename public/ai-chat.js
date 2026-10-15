@@ -9,6 +9,9 @@ async function api(url,options={}) {
   return data;
 }
 function status(message){const el=$("#aiChatStatus");if(el)el.textContent=message}
+function browserSpeak(text){const synth=window.speechSynthesis,SR=window.SpeechSynthesisUtterance;if(!synth||!SR){status("Reply received as text. Audio playback is not supported in this browser.");return false}try{synth.cancel();const utterance=new SR(String(text||""));utterance.lang="en-NG";utterance.rate=0.96;utterance.pitch=1;utterance.onerror=()=>status("Reply received, but audio playback failed. Check phone media volume and text-to-speech settings.");synth.speak(utterance);status("Reply received. Playing browser audio reply…");return true}catch{status("Reply received, but audio playback failed. Check the device volume and text-to-speech settings.");return false}}
+function speakReply(text){const value=String(text||"").trim();if(!value)return false;if(window.AndroidApp?.speakText){try{const state=typeof window.AndroidApp.getSpeechStatus==="function"?window.AndroidApp.getSpeechStatus():"ready";if(state!=="unavailable"){if(typeof window.AndroidApp.speakTextFor==="function")window.AndroidApp.speakTextFor(value,"ai-chat");else window.AndroidApp.speakText(value);status("Reply received. Playing audio reply…");return true}}catch{}}return browserSpeak(value)}
+window.addEventListener("omega-native-speech-fallback",event=>{const detail=event.detail;if(detail?.source==="ai-chat"&&detail.text&&$("#aiChatSpeak")?.checked)browserSpeak(detail.text)});
 function scrollBottom(){const box=$("#aiChatMessages");if(box)box.scrollTop=box.scrollHeight}
 function appendBookingPreview(preview){
  const box=$("#aiChatMessages");if(!box||!preview)return;
@@ -103,7 +106,7 @@ async function sendMessage(){
   }
   status(result.provider==="booking-assistant"?"Booking request prepared. Review the selections before generating a code.":"Answered by "+result.provider+(result.fallbackUsed?" after a provider fallback.":".")); 
   const spokenReply=String(result.reply||latestAssistantReply||"").trim();
-  if($("#aiChatSpeak")?.checked&&spokenReply){try{if(window.AndroidApp?.speakText){window.AndroidApp.speakText(spokenReply);status("Reply received. Playing audio reply…");}else if(window.speechSynthesis&&window.SpeechSynthesisUtterance){window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(spokenReply);utterance.lang="en-NG";utterance.rate=0.96;utterance.pitch=1;utterance.onerror=()=>status("Reply received, but audio playback failed. Check phone media volume and text-to-speech settings.");window.speechSynthesis.speak(utterance);}else{status("Reply received as text. Audio playback is not supported in this browser.");}}catch(e){status("Reply received, but audio playback failed. Check the device volume and text-to-speech settings.");}}
+  if($("#aiChatSpeak")?.checked&&spokenReply)speakReply(spokenReply);
  }catch(error){
   if(box){const pending=box.querySelector(".pending");if(pending)pending.remove()}
   status(error.message);
