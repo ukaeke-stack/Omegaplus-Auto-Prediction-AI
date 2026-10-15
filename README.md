@@ -54,18 +54,10 @@ Configure these Render environment variables only on the Auto Prediction AI serv
 - `SOCIAL_PUBLISHING_ENABLED` — keep `false` until you are ready to publish; set to `true` to enable scheduled and manual posting.
 - `APP_BASE_URL` — the public URL of the Auto Prediction AI service.
 
-Also add `APP_BASE_URL` and `CRON_SECRET` as GitHub Actions repository secrets. The workflow in `.github/workflows/social-publishing.yml` triggers the protected endpoint daily at 09:00 UTC (10:00 in Nigeria). GitHub Actions schedules can be delayed, so this is a daily automation rather than an exact-time guarantee. An administrator can trigger a post manually via the authenticated admin endpoint, and inspect configuration/recent outcomes through the admin status endpoint.
+Also add `APP_BASE_URL` and `CRON_SECRET` as GitHub Actions repository secrets. The workflow in `.github/workflows/social-publishing.yml` triggers the protected endpoint daily at 23:00 UTC (00:00 midnight in Nigeria, Africa/Lagos time) so the app can build/check that day's Daily Best selections and publish them. GitHub Actions schedules can be delayed, so this is a daily automation rather than an exact-time guarantee. If no quality-qualified selections are available at the time of the run, the endpoint skips posting; an administrator can trigger a post manually via the authenticated admin endpoint and inspect configuration/recent outcomes through the admin status endpoint.
 
 Publishing is text-only in this initial version. Social credentials must never be committed to GitHub, placed in the client app, or copied from Omegaplus Pro AI. Test with credentials and accounts owned or authorized by the app owner before enabling the schedule.
 
 ## Starting point
 
 The app was imported from commit `9b88b9b2466185f987c84d9b999237dbd90d9145` of the original project. Future changes in this repository must not modify the original Omegaplus Pro AI repository or its production database.
-
-## Multi-provider AI assistant
-
-The authenticated `/api/assistant/chat` endpoint uses Groq first (`openai/gpt-oss-120b`), Google Gemini second (`gemini-3.8-flash`), and Ollama Cloud third (`gpt-oss:120b-cloud`). A provider failure, timeout, rate limit, or invalid response moves to the next configured provider. API keys stay on the server. Conversation messages are stored in the app's PostgreSQL database and are scoped to the signed-in user. Requests about fixtures and predictions receive a bounded context snapshot from the app's actual SportyBet fixture feed and existing prediction engine; when that lookup fails, the assistant is instructed not to pretend it checked live data.
-
-Optional model overrides: `GROQ_MODEL`, `GEMINI_MODEL`, `OLLAMA_MODEL`; `AI_PROVIDER_TIMEOUT_MS` optionally overrides provider timeouts; otherwise Groq uses a shorter timeout and Gemini/Ollama Cloud use a longer timeout. If all providers fail, the API returns a service-unavailable response rather than fabricating an answer.
-
-The chat assistant does not place bets or create booking codes. Users must review real selections and use the existing explicit booking-code workflow. Betting outcomes are uncertain; no prediction is guaranteed.
