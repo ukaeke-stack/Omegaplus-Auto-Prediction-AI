@@ -1,0 +1,32 @@
+name: Snap Predict regression tests
+
+on:
+  pull_request:
+    paths:
+      - "server.js"
+      - "public/app.js"
+      - "public/index.html"
+      - "snap-image-matching.js"
+      - "test/**"
+      - ".github/workflows/snap-predict-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server.js"
+      - "public/app.js"
+      - "public/index.html"
+      - "snap-image-matching.js"
+      - "test/**"
+      - ".github/workflows/snap-predict-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npm test
