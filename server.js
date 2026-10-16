@@ -1,4 +1,5 @@
 import express from "express";
+import { matchSnapImageFixtures } from "./snap-image-matching.js";
 import {initAuthDb,authDbConfigured,dbReady,currentUser,requireAuth,requirePaid,requireRole,registerUser,createAdminUser,loginUser,createPasswordResetRequest,resetPasswordWithToken,logoutUser,setSessionCookie,clearSessionCookie,adminUsers,setUserAccess,adminStats,listPlans,createOrUpdatePlan,activateSubscription,revokeSubscription,audit,getAccessSettings,updateAccessSettings,grantFreeTrial,paymentHistory,createPaymentRecord,activateProviderSubscription,getAdminSettings,updateAdminSettings} from "./auth.js";
 import {put,get} from "@vercel/blob";
 import pg from "pg";
@@ -1422,16 +1423,15 @@ function snapFixtureAnalysis(fixture){
 app.post("/api/snap-predict/analyze-image",requirePaid,async(req,r)=>{
   try{
     const text=String(req.body?.ocrText||"").slice(0,12000);
-    if(text.trim().length<12)return r.status(400).json({ok:false,error:"The image text could not be read clearly. Try a sharper screenshot or crop the booking slip."});
-    const ocr=snapNormalizeText(text);
+    if(text.trim().length<12)return r.status(400).json({ok:false,error:"The image text could not be read clearly. Try a sharper screenshot or crop the fixture list."});
     const fixtures=await getSportyFixtures(false,true,"football");
+    const candidates=matchSnapImageFixtures(text,fixtures,30);
     const matches=[];
-    for(const fixture of fixtures){
-      const home=snapNormalizeText(fixture.home),away=snapNormalizeText(fixture.away);
-      if(home.length<4||away.length<4||/^(unknown|unknown team|sportybet|fixture unavailable)$/i.test(home)||/^(unknown|unknown team|sportybet|fixture unavailable)$/i.test(away))continue;
-      if(!ocr.includes(home)||!ocr.includes(away))continue;
+    for(const candidate of candidates){
+      const fixture=candidate.fixture;
       const picks=snapFixtureAnalysis(fixture);
-      if(!picks.length)continue;
+      const localContext=snapNormalizeText(candidate.context||text);
+      const home=snapNormalizeText(fixture.home),away=snapNormalizeText(fixture.away);
       const directHome=picks.find(p=>{
         const market=(fixture.markets||[]).find(m=>String(m.marketId||m.id||"")===String(p.marketId||"")&&String(m.specifier||"")===String(p.specifier||""));
         const label=snapNormalizeText(p.pick);
@@ -1446,10 +1446,6 @@ app.post("/api/snap-predict/analyze-image",requirePaid,async(req,r)=>{
         const market=(fixture.markets||[]).find(m=>String(m.marketId||m.id||"")===String(p.marketId||"")&&String(m.specifier||"")===String(p.specifier||""));
         return market&&isDirectWinningMarket(market)&&["draw","x"].includes(snapNormalizeText(p.pick));
       });
-      const homeIndex=ocr.indexOf(home),awayIndex=ocr.indexOf(away);
-      const left=Math.max(0,Math.min(homeIndex,awayIndex)-90);
-      const right=Math.min(ocr.length,Math.max(homeIndex+home.length,awayIndex+away.length)+120);
-      const localContext=ocr.slice(left,right);
       const goalLine=localContext.match(/\b(over|under)\s*(0\s*5|1\s*5|2\s*5|3\s*5|4\s*5)\b/);
       const exactMarketPick=goalLine?picks.find(p=>{
         const marketName=snapNormalizeText(p.market),pickName=snapNormalizeText(p.pick);
@@ -1458,17 +1454,31 @@ app.post("/api/snap-predict/analyze-image",requirePaid,async(req,r)=>{
         return (marketName.includes("total")||marketName.includes("over under")||String(p.marketId)==="18")&&pickName.includes(goalLine[1]+" "+line);
       }):null;
       const bttsHint=/\bboth teams to score\b|\bbtts\b/.test(localContext);
-      const bttsPick=bttsHint?picks.find(p=>/both teams to score|btts/.test(snapNormalizeText(p.market))&&snapNormalizeText(localContext).includes(snapNormalizeText(p.pick))):null;
-      const selectionHint=exactMarketPick||bttsPick||
+      const bttsPick=bttsHint?picks.find(p=>/both teams to score|btts/.test(snapNormalizeText(p.market))&&localContext.includes(snapNormalizeText(p.pick))):null;
+      const oddsHints=[...String(candidate.context||"").matchAll(/\b(\d{1,2}\.\d{2})\b/g)].map(m=>Number(m[1])).filter(n=>n>=1.01&&n<=100);
+      const oddsCandidates=picks.map(p=>({...p,oddsDelta:Math.min(...oddsHints.map(n=>Math.abs(Number(p.odds)-n)),Infinity)}))
+        .filter(p=>p.oddsDelta<=0.03).sort((a,b)=>a.oddsDelta-b.oddsDelta);
+      const oddsPick=oddsCandidates.length===1||(oddsCandidates.length>1&&oddsCandidates[0].oddsDelta+0.005<oddsCandidates[1].oddsDelta)?oddsCandidates[0]:null;
+      const selectionHint=exactMarketPick||bttsPick||oddsPick||
         (/\baway win\b|\baway\b|\b2\s*x\s*2\b/.test(localContext)?directAway:
          /\bdraw\b/.test(localContext)?directDraw:
          /\bhome win\b|\bhome\b|direct winning|1x2|match winner/.test(localContext)?directHome:null);
-      const selected=selectionHint;
-      const recommendation=selectionHint?null:(picks[0]||null);
-      matches.push({...(selected||{}),eventId:fixture.eventId,home:fixture.home,away:fixture.away,league:fixture.league||"",startTimeMs:fixture.startTimeMs||null,market:selected?.market||"",pick:selected?.pick||"",odds:selected?.odds??null,confidence:selected?.confidence??null,selectionType:selected?"original":"unread",recommendation:recommendation?{...recommendation}:null,marketOptions:picks.slice(0,8),selectedMarketId:selected?.marketId||"",selectedSpecifier:selected?.specifier||"",selectedOutcomeId:selected?.outcomeId||"",matchConfidence:100,matchMethod:"Exact team-name match"});
+      const selected=selectionHint||null;
+      matches.push({
+        ...(selected||{}),
+        eventId:fixture.eventId,home:fixture.home,away:fixture.away,league:fixture.league||"",
+        startTimeMs:fixture.startTimeMs||null,market:selected?.market||"",pick:selected?.pick||"",
+        odds:selected?.odds??null,confidence:selected?.confidence??null,
+        selectionType:selected?"original":"unread",recommendation:null,
+        marketOptions:picks.slice(0,8),
+        selectedMarketId:selected?.marketId||"",selectedSpecifier:selected?.specifier||"",
+        selectedOutcomeId:selected?.outcomeId||"",
+        matchConfidence:candidate.matchConfidence,matchMethod:candidate.matchMethod,
+        matchedContext:candidate.context,originalSelectionPreserved:true
+      });
     }
-    if(!matches.length)return r.json({ok:true,total:0,matches:[],ocrText:text,message:"The screenshot text was read, but no fixture with both recognizable team names matched the current SportyBet feed. Try a clearer image showing the full team names."});
-    r.json({ok:true,total:matches.length,matches:matches.slice(0,30),source:"SportyBet live markets",probabilityNote:"The displayed chance is an odds-implied estimate for the identified selection (for example, Home win), not a guarantee or independently verified win probability."});
+    if(!matches.length)return r.json({ok:true,total:0,matches:[],ocrText:text,message:"The image text was read, but no current fixture could be matched confidently. Matching checks fuzzy team names and uses nearby date/time text as supporting evidence. Try a clearer image showing the full team names, date and kickoff time."});
+    r.json({ok:true,total:matches.length,matches,source:"SportyBet live fixtures",originalSelectionPreserved:true,probabilityNote:"The original market and pick are shown only when readable from the screenshot. No replacement pick is applied automatically."});
   }catch(e){r.status(502).json({ok:false,error:e.message||"Could not analyze this screenshot."})}
 });
 app.post("/api/snap-predict/booking-code",requirePaid,async(req,r)=>{
