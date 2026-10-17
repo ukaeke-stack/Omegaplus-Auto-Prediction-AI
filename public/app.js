@@ -431,30 +431,46 @@ async function loadDailyBest(attempt=0){
       const chosen=rows.filter(x=>state.dailyBestSelected.has(x.id));
       if(!chosen.length){alert("Select the Daily Best games you want in the image first.");return}
       if(!dailyBestBookingCodeForImage){alert("Generate the booking code first. It will be displayed in bold, centered directly below the app name on the saved image.");return}
-      const canvas=document.createElement("canvas"),scale=2,pad=36,rowH=76,width=900,height=300+chosen.length*rowH;
+      const canvas=document.createElement("canvas"),scale=2,pad=36,rowH=88,width=900,height=330+chosen.length*rowH;
       canvas.width=width*scale;canvas.height=height*scale;
       const ctx=canvas.getContext("2d");ctx.scale(scale,scale);
       ctx.fillStyle="#071019";ctx.fillRect(0,0,width,height);
+      const fitText=(text,maxWidth,size,minSize=12,bold=false)=>{
+        let fontSize=size;
+        ctx.font=(bold?"bold ":"")+fontSize+"px Arial";
+        while(fontSize>minSize&&ctx.measureText(String(text)).width>maxWidth){fontSize--;ctx.font=(bold?"bold ":"")+fontSize+"px Arial"}
+        return fontSize;
+      };
       ctx.textAlign="center";
-      ctx.fillStyle="#b7f34b";ctx.font="bold 30px Arial";ctx.fillText("Omegaplus Auto prediction AI",width/2,48);
+      ctx.fillStyle="#b7f34b";
+      const title="Omegaplus Auto prediction AI";
+      ctx.font="bold 34px Arial";ctx.fillText(title,width/2,49);
       const codeLabel="Booking code: "+dailyBestBookingCodeForImage;
-      let codeFontSize=22;ctx.font="bold "+codeFontSize+"px Arial";
-      while(codeFontSize>13&&ctx.measureText(codeLabel).width>width-pad*2){codeFontSize--;ctx.font="bold "+codeFontSize+"px Arial"}
-      ctx.fillStyle="#b7f34b";ctx.fillText(codeLabel,width/2,82);
+      const codeFontSize=fitText(codeLabel,width-pad*2,27,13,true);
+      ctx.font="bold "+codeFontSize+"px Arial";ctx.fillText(codeLabel,width/2,89);
       ctx.textAlign="left";
-      ctx.fillStyle="#edf6fc";ctx.font="16px Arial";ctx.fillText(prettyDate(date)+" · "+chosen.length+" selected games",pad,116);
-      ctx.fillStyle="#91a5b6";ctx.font="14px Arial";ctx.fillText("1X2 or BTTS Yes only · Minimum odds 1.20",pad,142);
-      ctx.fillStyle="#b7f34b";ctx.font="bold 19px Arial";ctx.fillText("Combined odds: "+chosen.reduce((v,x)=>v*Number(x.odds||1),1).toFixed(2),pad,176);
-      let y=220;
+      ctx.fillStyle="#edf6fc";
+      const dateLabel=prettyDate(date)+" · "+chosen.length+" selected games";
+      ctx.font=fitText(dateLabel,width-pad*2,18,14,false)+"px Arial";ctx.fillText(dateLabel,pad,128);
+      ctx.fillStyle="#91a5b6";
+      const criteriaLabel="1X2 or BTTS Yes only · Minimum odds 1.20";
+      ctx.font=fitText(criteriaLabel,width-pad*2,16,13,false)+"px Arial";ctx.fillText(criteriaLabel,pad,157);
+      ctx.fillStyle="#b7f34b";
+      const combinedLabel="Combined odds: "+chosen.reduce((v,x)=>v*Number(x.odds||1),1).toFixed(2);
+      ctx.font="bold 22px Arial";ctx.fillText(combinedLabel,pad,198);
+      let y=244;
       chosen.forEach((x,i)=>{
-        ctx.fillStyle=i%2?"#0d1925":"#10202d";ctx.fillRect(pad,y-25,width-pad*2, rowH-5);
-        ctx.fillStyle="#91a5b6";ctx.font="12px Arial";ctx.fillText("#"+(x.dailyRank||i+1)+" · "+String(x.league||"").slice(0,62)+" · "+String(x.time||""),pad+12,y-5);
-        ctx.fillStyle="#edf6fc";ctx.font="bold 17px Arial";ctx.fillText((x.home||"")+" vs "+(x.away||""),pad+12,y+18);
-        ctx.fillStyle="#b7f34b";ctx.font="bold 15px Arial";ctx.fillText((x.marketType==="1x2"?"1X2":x.marketType==="btts"?"BTTS Yes":x.market||"")+" · "+(x.pick||"")+" · @"+Number(x.odds||0).toFixed(2),pad+12,y+39);
+        ctx.fillStyle=i%2?"#0d1925":"#10202d";ctx.fillRect(pad,y-28,width-pad*2,rowH-4);
+        const meta="#"+(x.dailyRank||i+1)+" · "+String(x.league||"")+" · "+String(x.time||"");
+        ctx.fillStyle="#91a5b6";ctx.font=fitText(meta,width-pad*2-24,15,11,false)+"px Arial";ctx.fillText(meta,pad+12,y-6);
+        const teams=(x.home||"")+" vs "+(x.away||"");
+        ctx.fillStyle="#edf6fc";ctx.font="bold "+fitText(teams,width-pad*2-24,21,14,true)+"px Arial";ctx.fillText(teams,pad+12,y+22);
+        const marketLine=(x.marketType==="1x2"?"1X2":x.marketType==="btts"?"BTTS Yes":x.market||"")+" · "+(x.pick||"")+" · @"+Number(x.odds||0).toFixed(2);
+        ctx.fillStyle="#b7f34b";ctx.font="bold "+fitText(marketLine,width-pad*2-24,18,12,true)+"px Arial";ctx.fillText(marketLine,pad+12,y+51);
         y+=rowH;
       });
-      ctx.fillStyle="#91a5b6";ctx.font="12px Arial";ctx.fillText("Predictions are estimates; verify live odds and availability before booking.",pad,height-20);
-      const fileName="omegaplus-daily-best-"+date+".png";const dataUrl=canvas.toDataURL("image/png");if(window.AndroidApp&&typeof window.AndroidApp.saveImage==="function"){window.AndroidApp.saveImage(dataUrl.split(",")[1],fileName);return}const link=document.createElement("a");link.download=fileName;link.href=dataUrl;link.target="_blank";document.body.appendChild(link);link.click();link.remove();
+      ctx.fillStyle="#91a5b6";ctx.font="14px Arial";ctx.fillText("Predictions are estimates; verify live odds and availability before booking.",pad,height-18);
+            const fileName="omegaplus-daily-best-"+date+".png";const dataUrl=canvas.toDataURL("image/png");if(window.AndroidApp&&typeof window.AndroidApp.saveImage==="function"){window.AndroidApp.saveImage(dataUrl.split(",")[1],fileName);return}const link=document.createElement("a");link.download=fileName;link.href=dataUrl;link.target="_blank";document.body.appendChild(link);link.click();link.remove();
     };
     renderDailyActions();
     refreshHistory(date).catch(()=>{});
