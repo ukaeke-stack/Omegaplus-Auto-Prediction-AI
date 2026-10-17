@@ -1249,7 +1249,7 @@ app.get("/api/daily-best",async(req,r)=>{try{
     await writePersistentArchive(date,existing,sport);
   }
   const saved=existing?.dailyBestPredictions;
-  const validSaved=existing?.dailyBestSelectionVersion===DAILY_SELECTION_VERSION&&Array.isArray(saved)&&((saved.length>=1&&saved.length<=15&&saved.every(p=>Number(p?.odds)>=DAILY_PREDICTION_MIN_ODDS&&((p.marketType==="1x2")||(p.marketType==="btts"&&/^yes$/i.test(String(p.pick))))))||(saved.length===0&&Number(existing.dailyFixtureCount)>0&&Boolean(existing.dailyMessage)));
+  const validSaved=existing?.dailyBestSelectionVersion===DAILY_SELECTION_VERSION&&Array.isArray(saved)&&((saved.length===15&&saved.every(p=>Number(p?.odds)>=DAILY_PREDICTION_MIN_ODDS&&((p.marketType==="1x2")||(p.marketType==="btts"&&/^yes$/i.test(String(p.pick))))))||(saved.length>=1&&saved.length<15&&Number(existing.dailyShortfall)===15-saved.length&&Number(existing.dailyFixtureCount)>0&&saved.every(p=>Number(p?.odds)>=DAILY_PREDICTION_MIN_ODDS&&((p.marketType==="1x2")||(p.marketType==="btts"&&/^yes$/i.test(String(p.pick))))))||(saved.length===0&&Number(existing.dailyFixtureCount)>0&&Boolean(existing.dailyMessage)));
   // Freeze a valid saved set for the whole Lagos calendar date, even after later code releases.
   if(existing?.sport===sport&&validSaved)
     return r.json({ok:true,date,sport,predictions:saved.slice(0,15),combinedOdds:Number(existing.dailyCombinedOdds)||0,shortfall:Number(existing.dailyShortfall)||0,message:existing.dailyMessage||"Daily Best 15 verified",archived:true});
@@ -1736,7 +1736,7 @@ async function runDailySocialPublishing(date){
   }
   predictions=predictions.filter(p=>p&&p.home&&p.away&&p.pick&&Number(p.odds)>1);
   if(!predictions.length)return {ok:true,date,status:"skipped",reason:"No quality-qualified Daily Best selections are available; nothing was published."};
-  const lines=predictions.slice(0,10).map((p,i)=>(i+1)+". "+p.home+" vs "+p.away+" — "+p.pick+" @ "+Number(p.odds).toFixed(2));
+  const lines=predictions.slice(0,15).map((p,i)=>(i+1)+". "+p.home+" vs "+p.away+" — "+p.pick+" @ "+Number(p.odds).toFixed(2));
   const message="Omegaplus Auto Prediction AI · Daily Best\n"+date+"\n\n"+lines.join("\n")+"\n\nSelections are statistical insights, not guarantees. Check current odds and match status before betting. 18+ only. #FootballPredictions #SportsAnalytics";
   const result=await publishDailyBestToSocials(date,message);
   return {ok:true,date,pickCount:predictions.length,combinedOdds,outcomes:result.outcomes};
