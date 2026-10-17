@@ -1249,7 +1249,7 @@ app.get("/api/daily-best",async(req,r)=>{try{
     await writePersistentArchive(date,existing,sport);
   }
   const saved=existing?.dailyBestPredictions;
-  const validSaved=Array.isArray(saved)&&((saved.length>=1&&saved.length<=15&&saved.every(p=>Number(p?.odds)>=DAILY_PREDICTION_MIN_ODDS&&((p.marketType==="1x2")||(p.marketType==="btts"&&/^yes$/i.test(String(p.pick))))))||(saved.length===0&&existing.dailyBestSelectionVersion===DAILY_SELECTION_VERSION&&Number(existing.dailyFixtureCount)>0&&Boolean(existing.dailyMessage)));
+  const validSaved=existing?.dailyBestSelectionVersion===DAILY_SELECTION_VERSION&&Array.isArray(saved)&&((saved.length>=1&&saved.length<=15&&saved.every(p=>Number(p?.odds)>=DAILY_PREDICTION_MIN_ODDS&&((p.marketType==="1x2")||(p.marketType==="btts"&&/^yes$/i.test(String(p.pick))))))||(saved.length===0&&Number(existing.dailyFixtureCount)>0&&Boolean(existing.dailyMessage)));
   // Freeze a valid saved set for the whole Lagos calendar date, even after later code releases.
   if(existing?.sport===sport&&validSaved)
     return r.json({ok:true,date,sport,predictions:saved.slice(0,15),combinedOdds:Number(existing.dailyCombinedOdds)||0,shortfall:Number(existing.dailyShortfall)||0,message:existing.dailyMessage||"Daily Best 15 verified",archived:true});
