@@ -1154,11 +1154,16 @@ async function buildDailyBest(date,sport="football"){
     selected.push(p);usedEvents.add(p.eventId);
     if(selected.length===15)break;
   }
-  if(selected.length<15)return {predictions:[],combinedOdds:0,shortfall:15-selected.length,qualifiedCount:selected.length,fixtureCount:fixtures.length,message:"Only "+selected.length+" distinct fixtures met the Direct Winning / BTTS Yes quality filter (minimum odds 1.20 and market probability 55%). No Daily Best 15 set was published rather than filling it with weaker picks."};
   const product=rows=>rows.reduce((v,p)=>v*Number(p.odds||1),1);
   const combinedOdds=product(selected);
   selected.sort((a,b)=>a.startTimeMs-b.startTimeMs);
-  const result={predictions:selected.map((p,i)=>({...p,dailyRank:i+1})),combinedOdds:+combinedOdds.toFixed(2),shortfall:0,qualifiedCount:15,fixtureCount:fixtures.length,message:"15 quality-qualified picks · Direct Winning (1X2) or BTTS Yes only · minimum odds 1.20 per pick · market probability floor 55%."};
+  const shortfall=Math.max(0,15-selected.length);
+  const message=selected.length===15
+    ?"15 quality-qualified picks · Direct Winning (1X2) or BTTS Yes only · minimum odds 1.20 per pick · market probability floor 55%."
+    :selected.length>0
+      ?"Only "+selected.length+" quality-qualified games were found after checking the available fixtures. Showing all qualifying games; "+shortfall+" short of 15. Direct Winning / BTTS Yes only, minimum odds 1.20."
+      :"No games met the Daily Best quality rules today. No selections were added. Direct Winning / BTTS Yes only, minimum odds 1.20.";
+  const result={predictions:selected.map((p,i)=>({...p,dailyRank:i+1})),combinedOdds:+combinedOdds.toFixed(2),shortfall,qualifiedCount:selected.length,fixtureCount:fixtures.length,message};
   console.info("[daily-best] build complete",JSON.stringify({date,fixtures:fixtures.length,candidates:unique.length,enriched:shortlist.length,picks:result.predictions.length,combinedOdds:result.combinedOdds,durationMs:Date.now()-buildStartedAt}));
   return result;
 }
@@ -1244,7 +1249,7 @@ app.get("/api/daily-best",async(req,r)=>{try{
     await writePersistentArchive(date,existing,sport);
   }
   const saved=existing?.dailyBestPredictions;
-  const validSaved=Array.isArray(saved)&&((saved.length===15&&saved.every(p=>Number(p?.odds)>=DAILY_PREDICTION_MIN_ODDS&&((p.marketType==="1x2")||(p.marketType==="btts"&&/^yes$/i.test(String(p.pick))))))||(saved.length===0&&existing.dailyBestSelectionVersion===DAILY_SELECTION_VERSION&&Number(existing.dailyFixtureCount)>0&&Boolean(existing.dailyMessage)));
+  const validSaved=Array.isArray(saved)&&((saved.length>=1&&saved.length<=15&&saved.every(p=>Number(p?.odds)>=DAILY_PREDICTION_MIN_ODDS&&((p.marketType==="1x2")||(p.marketType==="btts"&&/^yes$/i.test(String(p.pick))))))||(saved.length===0&&existing.dailyBestSelectionVersion===DAILY_SELECTION_VERSION&&Number(existing.dailyFixtureCount)>0&&Boolean(existing.dailyMessage)));
   // Freeze a valid saved set for the whole Lagos calendar date, even after later code releases.
   if(existing?.sport===sport&&validSaved)
     return r.json({ok:true,date,sport,predictions:saved.slice(0,15),combinedOdds:Number(existing.dailyCombinedOdds)||0,shortfall:Number(existing.dailyShortfall)||0,message:existing.dailyMessage||"Daily Best 15 verified",archived:true});
