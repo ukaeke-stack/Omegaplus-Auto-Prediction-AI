@@ -29,3 +29,9 @@ test("uses nearby date and kickoff time as supporting match evidence", () => {
   assert.equal(found[0].fixture.eventId, "a");
   assert.ok(found[0].matchConfidence >= 90);
 });
+
+test("keeps nearby original market and selection text with the matched fixture", () => {
+  const found = matchSnapImageFixtures("Premier League\nManchester United vs Chelsea\nOver 2.5 Goals\n16/10/2026 19:30\n1.95 3.20 4.10", fixtures);
+  assert.equal(found[0].fixture.eventId, "a");
+  assert.match(found[0].context, /Over 2\.5 Goals/);
+});
