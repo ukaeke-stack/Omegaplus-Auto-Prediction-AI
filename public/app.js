@@ -430,16 +430,22 @@ async function loadDailyBest(attempt=0){
     $("#dailySaveImage").onclick=()=>{
       const chosen=rows.filter(x=>state.dailyBestSelected.has(x.id));
       if(!chosen.length){alert("Select the Daily Best games you want in the image first.");return}
-      const canvas=document.createElement("canvas"),scale=2,pad=36,rowH=76,width=900,height=280+chosen.length*rowH;
+      if(!dailyBestBookingCodeForImage){alert("Generate the booking code first. It will be displayed in bold, centered directly below the app name on the saved image.");return}
+      const canvas=document.createElement("canvas"),scale=2,pad=36,rowH=76,width=900,height=300+chosen.length*rowH;
       canvas.width=width*scale;canvas.height=height*scale;
       const ctx=canvas.getContext("2d");ctx.scale(scale,scale);
       ctx.fillStyle="#071019";ctx.fillRect(0,0,width,height);
-      ctx.fillStyle="#b7f34b";ctx.font="bold 30px Arial";ctx.fillText("OMEGAPLUS · DAILY BEST",pad,48);
-      ctx.fillStyle="#edf6fc";ctx.font="16px Arial";ctx.fillText(prettyDate(date)+" · "+chosen.length+" selected games",pad,80);
-      ctx.fillStyle="#91a5b6";ctx.font="14px Arial";ctx.fillText("1X2 or BTTS Yes only · Minimum odds 1.20",pad,106);
-      ctx.fillStyle="#b7f34b";ctx.font="bold 19px Arial";ctx.fillText("Combined odds: "+chosen.reduce((v,x)=>v*Number(x.odds||1),1).toFixed(2),pad,140);
-      ctx.fillStyle=dailyBestBookingCodeForImage?"#b7f34b":"#91a5b6";ctx.font="bold 15px Arial";ctx.fillText("Booking code: "+(dailyBestBookingCodeForImage||"Not generated"),pad,170,width-pad*2);
-      let y=205;
+      ctx.textAlign="center";
+      ctx.fillStyle="#b7f34b";ctx.font="bold 30px Arial";ctx.fillText("Omegaplus Auto prediction AI",width/2,48);
+      const codeLabel="Booking code: "+dailyBestBookingCodeForImage;
+      let codeFontSize=22;ctx.font="bold "+codeFontSize+"px Arial";
+      while(codeFontSize>13&&ctx.measureText(codeLabel).width>width-pad*2){codeFontSize--;ctx.font="bold "+codeFontSize+"px Arial"}
+      ctx.fillStyle="#b7f34b";ctx.fillText(codeLabel,width/2,82);
+      ctx.textAlign="left";
+      ctx.fillStyle="#edf6fc";ctx.font="16px Arial";ctx.fillText(prettyDate(date)+" · "+chosen.length+" selected games",pad,116);
+      ctx.fillStyle="#91a5b6";ctx.font="14px Arial";ctx.fillText("1X2 or BTTS Yes only · Minimum odds 1.20",pad,142);
+      ctx.fillStyle="#b7f34b";ctx.font="bold 19px Arial";ctx.fillText("Combined odds: "+chosen.reduce((v,x)=>v*Number(x.odds||1),1).toFixed(2),pad,176);
+      let y=220;
       chosen.forEach((x,i)=>{
         ctx.fillStyle=i%2?"#0d1925":"#10202d";ctx.fillRect(pad,y-25,width-pad*2, rowH-5);
         ctx.fillStyle="#91a5b6";ctx.font="12px Arial";ctx.fillText("#"+(x.dailyRank||i+1)+" · "+String(x.league||"").slice(0,62)+" · "+String(x.time||""),pad+12,y-5);
