@@ -375,6 +375,7 @@ async function loadDailyBest(attempt=0){
     const odds=rows.reduce((v,x)=>v*Number(x.odds||1),1);
     if($("#bestPicksStatus"))$("#bestPicksStatus").textContent=d.message||"Direct Winning / BTTS Yes only · minimum odds 1.20 each · combined odds "+Number(d.combinedOdds||odds).toFixed(2);
     updateOutcomeSummary(rows,"daily");
+    if(rows.length){try{window.dispatchEvent(new CustomEvent("omega-daily-best-ready",{detail:{date,picks:rows.length,combinedOdds:Number(d.combinedOdds||odds)}}))}catch{}}
     if(!rows.length){
       box.innerHTML='<div class="empty">'+esc(d.message||("No 15-game quality-qualified Daily Best set is available for "+prettyDate(date)+"."))+'</div>';
       return;
@@ -447,7 +448,7 @@ async function loadDailyBest(attempt=0){
         y+=rowH;
       });
       ctx.fillStyle="#91a5b6";ctx.font="12px Arial";ctx.fillText("Predictions are estimates; verify live odds and availability before booking.",pad,height-20);
-      const link=document.createElement("a");link.download="omegaplus-daily-best-"+date+".png";link.href=canvas.toDataURL("image/png");link.click();
+      const fileName="omegaplus-daily-best-"+date+".png";const dataUrl=canvas.toDataURL("image/png");if(window.AndroidApp&&typeof window.AndroidApp.saveImage==="function"){window.AndroidApp.saveImage(dataUrl.split(",")[1],fileName);return}const link=document.createElement("a");link.download=fileName;link.href=dataUrl;link.target="_blank";document.body.appendChild(link);link.click();link.remove();
     };
     renderDailyActions();
     refreshHistory(date).catch(()=>{});
