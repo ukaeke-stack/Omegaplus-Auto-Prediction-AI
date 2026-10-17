@@ -7,6 +7,11 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Intent;
+import android.content.ContentValues;
+import android.provider.MediaStore;
+import android.widget.Toast;
+import android.util.Base64;
+import java.io.OutputStream;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -58,6 +63,7 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public void requestNotificationPermission(){runOnUiThread(()->{if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},4103);});}
         @JavascriptInterface public void showNotification(String title,String body){runOnUiThread(()->showNativeNotification(title,body));}
+        @JavascriptInterface public void saveImage(String base64Png,String fileName){runOnUiThread(()->savePngToGallery(base64Png,fileName));}
     }
 
     private void speakNow(String value,String source){
@@ -74,6 +80,26 @@ public class MainActivity extends Activity {
         if(webView==null||value==null||value.trim().isEmpty())return;
         String detail="{\"text\":"+JSONObject.quote(value)+",\"source\":"+JSONObject.quote(source==null?"default":source)+"}";
         webView.post(()->webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('omega-native-speech-fallback',{detail:"+detail+"}));",null));
+    }
+
+    private void savePngToGallery(String base64Png,String fileName){
+        try{
+            if(base64Png==null||base64Png.trim().isEmpty())throw new IllegalArgumentException("Image data is empty.");
+            byte[] bytes=Base64.decode(base64Png,Base64.DEFAULT);
+            String safeName=(fileName==null?"omegaplus-daily-best.png":fileName).replaceAll("[^A-Za-z0-9._-]","_");
+            if(!safeName.toLowerCase(Locale.ROOT).endsWith(".png"))safeName+=".png";
+            ContentValues values=new ContentValues();
+            values.put(MediaStore.Images.Media.DISPLAY_NAME,safeName);
+            values.put(MediaStore.Images.Media.MIME_TYPE,"image/png");
+            if(Build.VERSION.SDK_INT>=29)values.put(MediaStore.Images.Media.RELATIVE_PATH,"Pictures/Omegaplus");
+            Uri uri=getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,values);
+            if(uri==null)throw new IllegalStateException("Could not create image in gallery.");
+            try(OutputStream stream=getContentResolver().openOutputStream(uri)){
+                if(stream==null)throw new IllegalStateException("Could not open image output.");
+                stream.write(bytes);stream.flush();
+            }
+            Toast.makeText(this,"Image saved to Pictures/Omegaplus",Toast.LENGTH_LONG).show();
+        }catch(Exception e){Toast.makeText(this,"Could not save image: "+e.getMessage(),Toast.LENGTH_LONG).show();}
     }
 
     private void showNativeNotification(String title,String body){
