@@ -153,7 +153,7 @@ async function refreshHistory(date=historySelectedDate()){
       const generated=await jsonFetch("/api/daily-best?sport="+encodeURIComponent(state.sport)+"&date="+encodeURIComponent(date));
       archive={date,sport:state.sport,predictions:generated.predictions||[],correctScores:[],results:[]};
     }
-    let day=(archive?.dailyBestPredictions||archive?.predictions||[]).slice(0,10).map(x=>({...x,date,sport:state.sport}));
+    let day=(archive?.dailyBestPredictions||archive?.predictions||[]).slice(0,15).map(x=>({...x,date,sport:state.sport}));
     let correctScoreRows=(archive?.correctScores||[]).slice(0,5).map((x,i)=>({...x,id:x.id||"cs_"+(x.eventId||i),eventId:x.eventId||x.id||("cs_"+i),sport:"football",date,market:"Correct Score",outcome:x.outcome||"Pending"}));
     let resultRows=Array.isArray(archive?.results)?archive.results:[];
     // Use the result snapshot returned with the archive. A separate forced refresh here
@@ -371,15 +371,15 @@ async function loadDailyBest(attempt=0){
       if(date!==state.date)return;
       return loadDailyBest(attempt+1);
     }
-    const rows=(d.predictions||[]).slice(0,10).map(x=>({...x,outcome:x.outcome||"Pending"}));
+    const rows=(d.predictions||[]).slice(0,15).map(x=>({...x,outcome:x.outcome||"Pending"}));
     const odds=rows.reduce((v,x)=>v*Number(x.odds||1),1);
-    if($("#bestPicksStatus"))$("#bestPicksStatus").textContent=d.message||"Core markets only · combined odds "+Number(d.combinedOdds||odds).toFixed(2);
+    if($("#bestPicksStatus"))$("#bestPicksStatus").textContent=d.message||"Direct Winning / BTTS Yes only · minimum odds 1.20 each · combined odds "+Number(d.combinedOdds||odds).toFixed(2);
     updateOutcomeSummary(rows,"daily");
     if(!rows.length){
-      box.innerHTML='<div class="empty">'+esc(d.message||("No quality-qualified Daily 10 set is available for "+prettyDate(date)+"."))+'</div>';
+      box.innerHTML='<div class="empty">'+esc(d.message||("No 15-game quality-qualified Daily Best set is available for "+prettyDate(date)+"."))+'</div>';
       return;
     }
-    const actionBar='<div class="daily-actions"><button class="primary" id="dailySelectAll">Select All 10</button><button class="secondary" id="dailyClearAll">Clear Daily Selections</button><span class="daily-combo">Combined odds: <b>'+esc(Number(d.combinedOdds||odds).toFixed(2))+'</b></span></div>';
+    const actionBar='<div class="daily-actions"><button class="primary" id="dailySelectAll">Select All 15</button><button class="secondary" id="dailyClearAll">Clear Daily Selections</button><span class="daily-combo">Combined odds: <b>'+esc(Number(d.combinedOdds||odds).toFixed(2))+'</b></span></div>';
     box.innerHTML=rows.map(x=>'<article class="match compact"><div><div class="meta">#'+esc(x.dailyRank||"—")+' · '+esc(x.league)+' · '+esc(x.time)+'</div><div class="teams">'+esc(x.home)+' <span>vs</span> '+esc(x.away)+'</div><div class="pick"><span>'+esc(x.market)+' · '+esc(x.marketType==="1x2"?"1X2":x.marketType==="btts"?"BTTS":x.pick)+' · Odds '+esc(Number(x.odds||0).toFixed(2))+'</span><b>'+esc(x.pick)+'</b></div><div class="pick"><span>Result</span><b>'+esc(x.outcome)+'</b></div>'+predictionReasonsHtml(x)+'</div><div class="prob"><strong>'+esc(x.confidence)+'%</strong><button class="select '+(state.selected.has(x.id)?"selected":"")+'" data-top-id="'+esc(x.id)+'">'+(state.selected.has(x.id)?"Remove":"Select")+'</button></div></article>').join("")+actionBar;
     box.querySelector(".daily-actions").insertAdjacentHTML("beforeend",'<small id="dailySelectedCombo" class="daily-selected-combo">0 selected</small>');
     const renderDailyActions=()=>{
