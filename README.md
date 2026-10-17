@@ -34,7 +34,7 @@ This does not connect to or migrate any data from Omegaplus Pro AI. The local In
 
 The imported code contains Vercel-specific archive-backup support and a Vercel cron configuration. PostgreSQL is the primary history store; Vercel Blob is optional. Render does not run `vercel.json` cron schedules, so scheduled tasks must be configured separately after the daily-rollover behavior has been reviewed and adapted.
 
-The inherited daily-rollover route still assumes a fixed set of 10 Daily Best selections and is separate from the new social-publishing workflow. The social publisher only posts when the Daily Best builder returns qualifying selections; it does not fill an empty or shortfall set with unrelated fixtures. Review the legacy rollover route separately before scheduling it.
+The inherited daily-rollover route still assumes a fixed set of 15 Daily Best selections and is separate from the new social-publishing workflow. The social publisher only posts when the Daily Best builder returns qualifying selections; it does not fill an empty or shortfall set with unrelated fixtures. Review the legacy rollover route separately before scheduling it.
 
 ## Voice/text booking assistant
 

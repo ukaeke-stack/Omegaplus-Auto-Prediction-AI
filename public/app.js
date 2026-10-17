@@ -100,7 +100,7 @@ function updateOutcomeSummary(rows,prefix){
   const settled=won+lost,accuracy=settled?Math.round(won/settled*100):null;
   const set=(id,v)=>{if($("#"+id))$("#"+id).textContent=v};
   if(prefix==="history"){set("historyWon",won);set("historyLost",lost);set("historyPending",pending);set("historyAccuracy",accuracy===null?"—":accuracy+"%")}
-  if(prefix==="daily"){set("dailySelected",rows.length+"/10");set("dailyWon",won);set("dailyLost",lost);set("dailyAccuracy",accuracy===null?"—":accuracy+"%")}
+  if(prefix==="daily"){set("dailySelected",rows.length+"/15");set("dailyWon",won);set("dailyLost",lost);set("dailyAccuracy",accuracy===null?"—":accuracy+"%")}
 }
 function historySelectedDate(){
   return $("#historyDate")?.value||dateKey(new Date());
