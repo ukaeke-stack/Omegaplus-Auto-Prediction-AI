@@ -125,7 +125,8 @@ public class MainActivity extends Activity {
                 catch(Exception e){pendingFileChooser=null;callback.onReceiveValue(null);return false;}
             }
         });
-        WebSettings s=webView.getSettings();s.setJavaScriptEnabled(true);s.setDomStorageEnabled(true);s.setDatabaseEnabled(true);s.setAllowFileAccess(false);s.setSupportZoom(false);
+        WebSettings s=webView.getSettings();s.setJavaScriptEnabled(true);s.setDomStorageEnabled(true);s.setDatabaseEnabled(true);s.setAllowFileAccess(false);s.setSupportZoom(false);s.setCacheMode(WebSettings.LOAD_NO_CACHE);
+        webView.clearCache(true);
         webView.addJavascriptInterface(new AppBridge(),"AndroidApp");setContentView(webView);webView.loadUrl(APP_URL);
     }
 

@@ -380,6 +380,8 @@ async function loadDailyBest(attempt=0){
       return;
     }
     state.dailyBestSelected.clear();
+    let dailyBestBookingCodeForImage="";
+    const clearDailyBookingCode=()=>{dailyBestBookingCodeForImage="";const resultBox=$("#dailyBookingResult");if(resultBox)resultBox.hidden=true;};
     const actionBar='<div class="daily-actions"><button class="primary" id="dailySelectAll">Select All '+rows.length+'</button><button class="secondary" id="dailyClearAll">Clear Daily Selections</button><button class="primary" id="dailyGenerateBooking">Generate Booking Code</button><button class="secondary" id="dailySaveImage">Save Image</button><span class="daily-combo">Combined odds: <b>'+esc(Number(d.combinedOdds||odds).toFixed(2))+'</b></span><small id="dailySelectedCombo" class="daily-selected-combo">0 selected</small></div><div id="dailyBookingResult" class="booking-result" aria-live="polite" hidden><small id="dailyBookingTarget">DAILY BEST BOOKING CODE</small><strong id="dailyBookingCode"></strong><small id="dailyBookingSource"></small><div id="dailyBookingUnavailable" class="muted"></div><button class="secondary" id="dailyCopyBooking">Copy code</button></div>';
     box.innerHTML=rows.map(x=>'<article class="match compact"><div><div class="meta">#'+esc(x.dailyRank||"—")+' · '+esc(x.league)+' · '+esc(x.time)+'</div><div class="teams">'+esc(x.home)+' <span>vs</span> '+esc(x.away)+'</div><div class="pick"><span>'+esc(x.market)+' · '+esc(x.marketType==="1x2"?"1X2":x.marketType==="btts"?"BTTS":x.pick)+' · Odds '+esc(Number(x.odds||0).toFixed(2))+'</span><b>'+esc(x.pick)+'</b></div><div class="pick"><span>Result</span><b>'+esc(x.outcome)+'</b></div>'+predictionReasonsHtml(x)+'</div><div class="prob"><strong>'+esc(x.confidence)+'%</strong><button class="select '+(state.dailyBestSelected.has(x.id)?"selected":"")+'" data-top-id="'+esc(x.id)+'">'+(state.dailyBestSelected.has(x.id)?"Remove":"Select")+'</button></div></article>').join("")+actionBar;
     const renderDailyActions=()=>{
@@ -392,13 +394,15 @@ async function loadDailyBest(attempt=0){
       document.querySelectorAll("#dailyBest [data-top-id]").forEach(b=>{const on=state.dailyBestSelected.has(b.dataset.topId);b.classList.toggle("selected",on);b.textContent=on?"Remove":"Select"});
     };
     $("#dailySelectAll").onclick=()=>{
+      clearDailyBookingCode();
       const allSelected=rows.length>0&&rows.every(x=>state.dailyBestSelected.has(x.id));
       if(allSelected)rows.forEach(x=>state.dailyBestSelected.delete(x.id));
       else rows.forEach(x=>state.dailyBestSelected.set(x.id,x));
       renderDailyActions();
     };
-    $("#dailyClearAll").onclick=()=>{rows.forEach(x=>state.dailyBestSelected.delete(x.id));renderDailyActions()};
+    $("#dailyClearAll").onclick=()=>{clearDailyBookingCode();rows.forEach(x=>state.dailyBestSelected.delete(x.id));renderDailyActions()};
     document.querySelectorAll("#dailyBest [data-top-id]").forEach(b=>b.onclick=()=>{
+      clearDailyBookingCode();
       const row=rows.find(x=>x.id===b.dataset.topId);if(!row)return;
       if(state.dailyBestSelected.has(row.id))state.dailyBestSelected.delete(row.id);else if(state.dailyBestSelected.size<15)state.dailyBestSelected.set(row.id,row);
       renderDailyActions();
@@ -413,7 +417,8 @@ async function loadDailyBest(attempt=0){
         const bookmaker=$("#bookmaker")?.value||"sportybet";
         const response=await fetch("/api/booking-code",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({sport:"football",bookmaker,selections:chosen.map(x=>({eventId:x.eventId,home:x.home,away:x.away,pick:x.pick,marketId:x.marketId,specifier:x.specifier,outcomeId:x.outcomeId,date:x.date||date}))})});
         const result=await response.json();if(!response.ok||!result.ok)throw new Error(result.error||"Booking code unavailable.");
-        $("#dailyBookingCode").textContent=result.bookingCode||"";
+        dailyBestBookingCodeForImage=String(result.bookingCode||"");
+        $("#dailyBookingCode").textContent=dailyBestBookingCodeForImage;
         $("#dailyBookingTarget").textContent=(result.target||bookmaker)+" · DAILY BEST BOOKING CODE";
         $("#dailyBookingSource").textContent=(result.source||"")+" · "+(result.availableSelections?.length??chosen.length)+" available selection(s)";
         $("#dailyBookingUnavailable").textContent=result.unavailableSelections?.length?result.unavailableSelections.length+" selection(s) were unavailable and excluded.": "";
@@ -424,7 +429,7 @@ async function loadDailyBest(attempt=0){
     $("#dailySaveImage").onclick=()=>{
       const chosen=rows.filter(x=>state.dailyBestSelected.has(x.id));
       if(!chosen.length){alert("Select the Daily Best games you want in the image first.");return}
-      const canvas=document.createElement("canvas"),scale=2,pad=36,rowH=76,width=900,height=180+chosen.length*rowH+45;
+      const canvas=document.createElement("canvas"),scale=2,pad=36,rowH=76,width=900,height=280+chosen.length*rowH;
       canvas.width=width*scale;canvas.height=height*scale;
       const ctx=canvas.getContext("2d");ctx.scale(scale,scale);
       ctx.fillStyle="#071019";ctx.fillRect(0,0,width,height);
@@ -432,7 +437,8 @@ async function loadDailyBest(attempt=0){
       ctx.fillStyle="#edf6fc";ctx.font="16px Arial";ctx.fillText(prettyDate(date)+" · "+chosen.length+" selected games",pad,80);
       ctx.fillStyle="#91a5b6";ctx.font="14px Arial";ctx.fillText("1X2 or BTTS Yes only · Minimum odds 1.20",pad,106);
       ctx.fillStyle="#b7f34b";ctx.font="bold 19px Arial";ctx.fillText("Combined odds: "+chosen.reduce((v,x)=>v*Number(x.odds||1),1).toFixed(2),pad,140);
-      let y=176;
+      ctx.fillStyle=dailyBestBookingCodeForImage?"#b7f34b":"#91a5b6";ctx.font="bold 15px Arial";ctx.fillText("Booking code: "+(dailyBestBookingCodeForImage||"Not generated"),pad,170,width-pad*2);
+      let y=205;
       chosen.forEach((x,i)=>{
         ctx.fillStyle=i%2?"#0d1925":"#10202d";ctx.fillRect(pad,y-25,width-pad*2, rowH-5);
         ctx.fillStyle="#91a5b6";ctx.font="12px Arial";ctx.fillText("#"+(x.dailyRank||i+1)+" · "+String(x.league||"").slice(0,62)+" · "+String(x.time||""),pad+12,y-5);
