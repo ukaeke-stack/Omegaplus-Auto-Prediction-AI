@@ -121,7 +121,7 @@ export function matchSnapImageFixtures(ocrText, fixtures, limit = 30) {
     const confidence = Math.round(best.score * 100);
     results.push({
       fixture,
-      context: best.text,
+      context: lines.slice(Math.max(0, best.start - 2), Math.min(lines.length, best.end + 4)).join(" "),
       matchConfidence: confidence,
       matchMethod: best.bonus
         ? "Fuzzy team-name match with date/time support"
